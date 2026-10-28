@@ -65,9 +65,19 @@ node --check server.js
 node --check deck.js
 node --check game.js
 node --check deal-animation.js
-node --test tests/confirmations.test.js tests/game.test.js tests/reactions.test.js
+node --test tests/confirmations.test.js tests/game.test.js tests/reactions.test.js tests/invitations.test.js tests/avatars.test.js
 ```
 
-28 pruebas: privacidad y persistencia, ocho cartas, permisos de turno/propiedad/color/tipo, doble robo simultáneo, una carta por turno, pasar después de robar, umbral 25/26, eliminación por acumulación, suma de penalizaciones y reinicio de la cuenta al cumplirlas, turnos que saltan eliminados, dado virtual/físico, selecciones, victoria, historial de varias reacciones y limpieza al iniciar/terminar. En navegador se verificaron la animación inicial, robo con Pasar turno y dos reacciones del mismo jugador conservadas al recargar.
+30 pruebas: privacidad y persistencia, ocho cartas, permisos de turno/propiedad/color/tipo, doble robo simultáneo, una carta por turno, pasar después de robar, umbral 25/26, eliminación por acumulación, suma de penalizaciones y reinicio de la cuenta al cumplirlas, turnos que saltan eliminados, dado virtual/físico, selecciones, victoria, historial de varias reacciones y limpieza al iniciar/terminar. En navegador se verificaron la animación inicial, robo con Pasar turno y dos reacciones del mismo jugador conservadas al recargar.
 
 Vistas visuales sin conexión: /play?preview=hand, /play?preview=task y /play?preview=selection.
+
+## Invitaciones por enlace y QR
+
+El lobby presenta el enlace fijo /play para ingresar el código manualmente y un QR con /play?room=CODIGO para completar la sala automáticamente. Copiar invitación copia el código y el enlace directo. El jugador confirma su nombre antes de entrar. El QR se genera localmente con vendor/qrcode.js (MIT; licencia incluida), sin servicios externos.
+
+Al publicar, puede configurarse PUBLIC_URL con el origen HTTPS del juego. Si no se configura, un navegador abierto en un dominio público usa ese mismo origen; en localhost se usa la dirección LAN disponible. En local los teléfonos deben acceder a la misma red.
+
+## Avatares
+
+Al unirse, cada jugador elige uno de los seis avatares transparentes de Resource/Users/Sin Fondo. avatars.js comparte el catálogo entre el servidor y las pantallas. El servidor valida la selección y la conserva con la sesión. El lobby, la mesa, el turno y la lista móvil muestran esa misma imagen. Las salas anteriores reciben un avatar predeterminado compatible.

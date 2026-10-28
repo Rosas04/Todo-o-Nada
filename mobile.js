@@ -2,6 +2,14 @@ let playerSession=null,playerState=null,mobileStream=null,submitting=false,lastD
 let gameActionBusy=false,lastDiceResultId=null,diceAnimationTimer=null,mobileDealing=false,reactionBusy=false;
 const mobilePreview=new URLSearchParams(location.search).get('preview');
 const el=id=>document.getElementById(id);
+let selectedAvatar=PLAYER_AVATARS[0].file;
+try{const saved=localStorage.getItem('todo-nada-avatar');if(PLAYER_AVATARS.some(avatar=>avatar.file===saved))selectedAvatar=saved;}catch{}
+PLAYER_AVATARS.forEach(avatar=>{
+ const label=document.createElement('label'),input=document.createElement('input'),image=document.createElement('img');
+ input.type='radio';input.name='avatar';input.value=avatar.file;input.checked=avatar.file===selectedAvatar;input.setAttribute('aria-label',avatar.name);
+ input.addEventListener('change',()=>{selectedAvatar=avatar.file;try{localStorage.setItem('todo-nada-avatar',selectedAvatar);}catch{}});
+ image.src=mobileAsset('Users/Sin Fondo/'+avatar.file);image.alt='';label.title=avatar.name;label.append(input,image);el('avatarOptions').append(label);
+});
 async function playerRequest(endpoint,data){const response=await fetch(endpoint,{method:data===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(playerSession?{Authorization:'Bearer '+playerSession.token}:{})},...(data===undefined?{}:{body:JSON.stringify(data)})});const result=await response.json();if(!response.ok)throw Error(result.error||'No se pudo conectar.');return result;}
 function renderMobile(state){
  playerState=state;el('mobileEntry').hidden=true;el('joinMobile').hidden=true;
@@ -116,8 +124,10 @@ async function connectMobile(){
  mobileStream.onmessage=e=>{el('mobileStatus').textContent='Conectado';el('mobileTaskStatus').textContent='';renderMobile(JSON.parse(e.data));};
  mobileStream.onerror=()=>{el('mobileStatus').textContent='Reconectando… No cierres esta pantalla.';el('mobileTaskStatus').textContent='Reconectando… La carta sigue pendiente.';el('completeTask').disabled=true;};
 }
-el('joinCode').value=new URLSearchParams(location.search).get('room')||'';
-el('joinMobile').addEventListener('submit',async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{playerSession=await playerRequest('/api/join',{code:el('joinCode').value.trim().toUpperCase(),name:el('joinName').value.trim()});try{sessionStorage.setItem('todo-nada-phone',JSON.stringify(playerSession));}catch{}await connectMobile();}catch(error){el('mobileStatus').textContent=error.message;}finally{button.disabled=false;}});
+const invitedRoom=(new URLSearchParams(location.search).get('room')||'').trim().toUpperCase();
+el('joinCode').value=invitedRoom;
+if(invitedRoom){el('joinMobile').querySelector('h1').textContent='ENTRAR A LA SALA '+invitedRoom;el('joinName').focus();}
+el('joinMobile').addEventListener('submit',async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{playerSession=await playerRequest('/api/join',{code:el('joinCode').value.trim().toUpperCase(),name:el('joinName').value.trim(),avatar:selectedAvatar});try{sessionStorage.setItem('todo-nada-phone',JSON.stringify(playerSession));}catch{}await connectMobile();}catch(error){el('mobileStatus').textContent=error.message;}finally{button.disabled=false;}});
 el('completeTask').addEventListener('click',async()=>{if(submitting||!playerState?.pending)return;if(['task','selection'].includes(mobilePreview)){renderMobile({...playerState,pending:null});renderHand(true);el('mobileStatus').textContent='Vista de diseño · confirmación de ejemplo';return;}submitting=true;el('completeTask').disabled=true;const taskId=playerState.pending.id;try{await playerRequest('/api/complete',{taskId,selectedPlayerId:selectedTargetId});el('mobileStatus').textContent='¡Confirmado! La carta se cerró en la mesa.';renderMobile(await playerRequest('/api/state'));}catch(error){el('mobileStatus').textContent=error.message;el('mobileTaskStatus').textContent=error.message;}finally{submitting=false;renderPlayerSelection(playerState?.pending);}});
 el('mobileCardDialog').addEventListener('cancel',e=>e.preventDefault());
 async function leaveMobileRoom(){if(!['hand','task','selection'].includes(mobilePreview)){try{await playerRequest('/api/leave',{});}catch(error){el('mobileStatus').textContent=error.message;return;}}mobileStream?.close();mobileStream=null;playerSession=null;playerState=null;try{sessionStorage.removeItem('todo-nada-phone');}catch{}el('mobileEntry').hidden=false;el('joinMobile').hidden=false;el('mobileGame').hidden=true;el('mobileLobby').hidden=true;document.body.classList.remove('is-playing');el('mobileStatus').textContent='Saliste de la sala.';}
@@ -139,7 +149,7 @@ function mobileAsset(file){return '/Resource/'+file.split('/').map(encodeURIComp
 function renderRoster(players){
  const avatars=['pato-sinfondo.png','fantasmacute-sinfondo.png','calavera-sinfondo.png','caraderretida-sinfondo.png','fantasma-sinfondo.png'];
  el('mobileRoster').replaceChildren();
- players.forEach((player,index)=>{const item=document.createElement('div');item.className='rail-player'+(player.connected?'':' offline')+(player.id===playerSession?.id?' me':'');item.setAttribute('aria-label',player.name+(player.connected?' · conectado':' · desconectado'));item.title=player.name;const img=document.createElement('img');img.src=mobileAsset('Users/Sin Fondo/'+avatars[index%avatars.length]);img.alt='';item.append(img,document.createElement('i'));el('mobileRoster').append(item);});
+ players.forEach((player,index)=>{const item=document.createElement('div');item.className='rail-player'+(player.connected?'':' offline')+(player.id===playerSession?.id?' me':'');item.setAttribute('aria-label',player.name+(player.connected?' · conectado':' · desconectado'));item.title=player.name;const img=document.createElement('img');img.src=mobileAsset('Users/Sin Fondo/'+(player.avatar||avatars[index%avatars.length]));img.alt='';item.append(img,document.createElement('i'));el('mobileRoster').append(item);});
 }
 function renderHand(preview){
  const hand=el('mobileHand');

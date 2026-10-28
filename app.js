@@ -61,7 +61,7 @@ function renderLobby(){
  $('lobbyCount').textContent=online.length+' / '+(expected||'—')+' jugadores';
  $('waitingPlayers').replaceChildren();
  if(!roster.length)$('waitingPlayers').innerHTML='<div class="waiting-empty"><span>♧</span><h3>Aquí comienza el grupo</h3><p>Esperando a que los jugadores se unan.</p></div>';
- roster.forEach((p,i)=>{const item=document.createElement('div');item.className='waiting-player';const image=document.createElement('img');image.src=asset('Users/Sin Fondo/'+['pato-sinfondo.png','fantasmacute-sinfondo.png','calavera-sinfondo.png'][i%3]);image.alt='';const name=document.createElement('strong');name.textContent=p.name;const status=document.createElement('span');status.textContent=p.connected?'Conectado':'Sin conexión';item.append(image,name,status);$('waitingPlayers').append(item);});
+ roster.forEach((p,i)=>{const item=document.createElement('div');item.className='waiting-player';const image=document.createElement('img');image.src=asset('Users/Sin Fondo/'+(p.avatar||PLAYER_AVATARS[i%PLAYER_AVATARS.length].file));image.alt='';const name=document.createElement('strong');name.textContent=p.name;const status=document.createElement('span');status.textContent=p.connected?'Conectado':'Sin conexión';item.append(image,name,status);$('waitingPlayers').append(item);});
  $('startDemo').disabled=!expected||online.length<expected;
  $('waitingStatus').textContent=expected&&online.length>=expected?'La sala está lista.':'Esperando a los jugadores…';
 }
@@ -203,8 +203,25 @@ window.addEventListener('hashchange',()=>{if(location.hash!=='#table'){clearTime
 // Basic phone-to-table confirmation; gameplay and private hands remain separate.
 let roomConnection=null,roomStream=null,bridgePromise=null,remoteTaskId=null,assigning=false,creatingTask=false,lastResolutionId=null,lastSeenPlayId=null,lastSeenDiceId=null;
 const phonePanel=document.createElement('div');phonePanel.className='lobby-phone-link';
-phonePanel.innerHTML='<p>Desde tu celular</p><a id="phoneJoinLink" target="_blank" rel="noopener"></a><p id="phoneStatus" role="status">Conectando con la sala…</p>';
+phonePanel.innerHTML='<div class="join-method"><span class="join-method-label">ESCANEA Y ENTRA A ESTA SALA</span><a id="phoneQrLink" class="room-qr" target="_blank" rel="noopener" aria-label="Abrir la sala en el celular"></a><small>Solo escribe tu nombre para entrar.</small></div><div class="join-method manual-join"><span class="join-method-label">O ABRE EL ENLACE E INGRESA EL CÓDIGO</span><a id="phoneJoinLink" target="_blank" rel="noopener"></a></div><button id="copyInvitation" type="button" class="copy-invitation">Copiar invitación ↗</button><p id="phoneStatus" role="status">Conectando con la sala…</p>';
 document.querySelector('.invite-panel').append(phonePanel);
+let invitationUrl=null,invitationQrUrl=null;
+function renderRoomInvitation(state){
+ const loopback=['localhost','127.0.0.1','[::1]'].includes(location.hostname);
+ const base=state.publicUrl||(!loopback?location.origin:state.joinUrls?.[0]?new URL(state.joinUrls[0]).origin:location.origin);
+ const entry=new URL('/play',base),direct=new URL(entry);direct.searchParams.set('room',state.code);
+ invitationUrl=direct.href;$('phoneJoinLink').href=entry.href;$('phoneJoinLink').textContent=entry.host+entry.pathname;
+ $('phoneQrLink').href=direct.href;
+ if(invitationQrUrl!==direct.href){
+  const qr=qrcode(0,'M');qr.addData(direct.href);qr.make();
+  $('phoneQrLink').innerHTML=qr.createSvgTag({cellSize:4,margin:16,scalable:true,alt:'QR para entrar a la sala '+state.code});
+  invitationQrUrl=direct.href;
+ }
+}
+$('copyInvitation').addEventListener('click',async()=>{
+ try{if(!invitationUrl)await ensurePhoneRoom();await navigator.clipboard.writeText('¡Juguemos TODO O NADA!\nSala: '+currentRoomCode()+'\n'+invitationUrl);toast('Invitación copiada.');}
+ catch{toast('No se pudo copiar. Abre el QR para copiar el enlace de la sala.');}
+});
 const mobileStatus=document.createElement('p');mobileStatus.id='mobileConfirmationStatus';mobileStatus.className='mobile-confirmation-status';mobileStatus.setAttribute('role','status');$('cardDialog').append(mobileStatus);
 function currentRoomCode(){return roomConnection?.code||'Sin sala';}
 async function roomRequest(endpoint,data){
@@ -216,7 +233,7 @@ function applyRoomState(state){
  syncReactionHistory(state);
  window.playDealAnimation?.(state);
  const avatarNames=['pato-sinfondo.png','fantasmacute-sinfondo.png','calavera-sinfondo.png','caraderretida-sinfondo.png'];
- players.splice(0,players.length,...state.players.map((p,i)=>({...p,avatar:avatarNames[i%avatarNames.length],cards:p.cardCount??null})));
+ players.splice(0,players.length,...state.players.map((p,i)=>({...p,avatar:p.avatar||avatarNames[i%avatarNames.length],cards:p.cardCount??null})));
  const turnIndex=players.findIndex(player=>player.id===state.turnPlayerId);
  active=turnIndex>=0?turnIndex:players.length?active%players.length:0;render();
  const online=state.players.filter(p=>p.connected);
@@ -272,8 +289,7 @@ function ensurePhoneRoom(){
   let state;
   if(roomConnection){try{state=await roomRequest('/api/state');}catch{roomConnection=null;}}
   if(!roomConnection){location.hash='home';throw Error('Configura la sala antes de crearla.');}
-  const joinUrl=state.joinUrls?.[0]||location.origin+'/play?room='+roomConnection.code;
-  $('phoneJoinLink').href=joinUrl;$('phoneJoinLink').textContent=joinUrl;
+  renderRoomInvitation(state);
   applyRoomState(state);
   if(state.pending&&state.pending.publicModal!==false&&location.hash==='#table'&&!$('cardDialog').open){
    effectBusy=true;lastPublicCard={id:'text'};$('cardDialog').classList.add('text-only');$('cardDialog').setAttribute('aria-labelledby','cardModalText');$('cardModalText').textContent=state.pending.text;remoteTaskId=state.pending.id;$('cardDialog').showModal();applyRoomState(state);

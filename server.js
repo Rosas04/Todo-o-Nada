@@ -7,14 +7,16 @@ const writtenCards=require('./cards');
 const {dealRoom,activeColors}=require('./deck');
 const disk=require('node:fs');
 const game=require('./game');
+const avatars=require('./avatars');
 const root=__dirname;
 const types={'.html':'text/html; charset=utf-8','.css':'text/css','.js':'text/javascript','.png':'image/png','.jpg':'image/jpeg','.md':'text/plain; charset=utf-8'};
-function createServer({statePath=null}={}){
+function createServer({statePath=null,publicUrl=process.env.PUBLIC_URL||null}={}){
+ if(publicUrl){const address=new URL(publicUrl);if(!['https:','http:'].includes(address.protocol)||address.username||address.password)throw Error('PUBLIC_URL debe ser una dirección HTTP o HTTPS.');publicUrl=address.origin;}
  const rooms=new Map();
  const reactionTimes=new WeakMap();
  if(statePath&&disk.existsSync(statePath)){
   const saved=JSON.parse(disk.readFileSync(statePath,'utf8'));
-  for(const data of saved){delete data.config.initialCards;const players=new Map(data.players.map(p=>[p.id,{...p,streams:new Set()}]));const restored={...data,reactions:data.phase==='finished'?[]:data.reactions||[],activeColor:data.activeColor||data.topCard?.color||null,direction:data.direction||1,players,clients:new Set()};if(restored.phase==='playing')game.enforceLimits(restored);rooms.set(data.code,restored);}
+  for(const data of saved){delete data.config.initialCards;const players=new Map(data.players.map((p,index)=>[p.id,{...p,avatar:avatars.some(a=>a.file===p.avatar)?p.avatar:avatars[index%avatars.length].file,streams:new Set()}]));const restored={...data,reactions:data.phase==='finished'?[]:data.reactions||[],activeColor:data.activeColor||data.topCard?.color||null,direction:data.direction||1,players,clients:new Set()};if(restored.phase==='playing')game.enforceLimits(restored);rooms.set(data.code,restored);}
  }
  function persist(){
   if(!statePath)return;
@@ -22,7 +24,7 @@ function createServer({statePath=null}={}){
   disk.mkdirSync(path.dirname(statePath),{recursive:true});disk.writeFileSync(statePath+'.tmp',JSON.stringify(saved));disk.renameSync(statePath+'.tmp',statePath);
  }
  function json(res,status,data){res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));}
- function snapshot(room,identity){return {code:room.code,phase:room.phase,config:{mode:room.config.mode,expectedPlayers:room.config.expectedPlayers},dealId:room.dealId||null,dealtAt:room.dealtAt||null,...(identity.role==='host'?{reactions:room.phase==='finished'?[]:room.reactions||[]}:{}),topCard:room.topCard||null,activeColors:activeColors(room),activeColor:room.activeColor||room.topCard?.color||null,direction:room.direction||1,lastPlay:room.lastPlay||null,diceTask:room.diceTask||null,diceResult:room.diceResult||null,penalty:room.penalty||null,winnerId:room.winnerId||null,deckRemaining:room.deck?.length??null,turnPlayerId:room.turnPlayerId||null,...(identity.role==='player'?{hand:room.players.get(identity.id)?.eliminated?[]:room.players.get(identity.id)?.hand||[],canDraw:game.canDraw(room,identity.id),canPass:game.canPass(room,identity.id),playableCardIds:(room.players.get(identity.id)?.hand||[]).filter(card=>game.canPlay(room,identity.id,card)).map(card=>card.id)}:{}),resolution:room.resolution||null,players:[...room.players.values()].map(p=>({id:p.id,name:p.name,connected:p.streams.size>0,cardCount:p.hand?.length??null,eliminated:Boolean(p.eliminated),eliminationReason:p.eliminationReason||null})),pending:identity.role==='host'||room.pending?.playerId===identity.id?room.pending:null};}
+ function snapshot(room,identity){return {code:room.code,phase:room.phase,config:{mode:room.config.mode,expectedPlayers:room.config.expectedPlayers},dealId:room.dealId||null,dealtAt:room.dealtAt||null,...(identity.role==='host'?{reactions:room.phase==='finished'?[]:room.reactions||[]}:{}),topCard:room.topCard||null,activeColors:activeColors(room),activeColor:room.activeColor||room.topCard?.color||null,direction:room.direction||1,lastPlay:room.lastPlay||null,diceTask:room.diceTask||null,diceResult:room.diceResult||null,penalty:room.penalty||null,winnerId:room.winnerId||null,deckRemaining:room.deck?.length??null,turnPlayerId:room.turnPlayerId||null,...(identity.role==='player'?{hand:room.players.get(identity.id)?.eliminated?[]:room.players.get(identity.id)?.hand||[],canDraw:game.canDraw(room,identity.id),canPass:game.canPass(room,identity.id),playableCardIds:(room.players.get(identity.id)?.hand||[]).filter(card=>game.canPlay(room,identity.id,card)).map(card=>card.id)}:{}),resolution:room.resolution||null,players:[...room.players.values()].map(p=>({id:p.id,name:p.name,avatar:p.avatar||avatars[0].file,connected:p.streams.size>0,cardCount:p.hand?.length??null,eliminated:Boolean(p.eliminated),eliminationReason:p.eliminationReason||null})),pending:identity.role==='host'||room.pending?.playerId===identity.id?room.pending:null};}
  function broadcast(room){persist();for(const client of room.clients){if(client.res.destroyed||client.res.writableEnded)continue;client.res.write('data: '+JSON.stringify(snapshot(room,client.identity))+'\n\n');}}
  async function body(req){let bytes=0,parts=[];for await(const chunk of req){bytes+=chunk.length;if(bytes>12000)throw Error('Solicitud demasiado grande');parts.push(chunk);}return JSON.parse(Buffer.concat(parts).toString()||'{}');}
  function authenticate(req,url){const token=req.headers.authorization?.replace(/^Bearer /,'')||url.searchParams.get('token');for(const room of rooms.values()){if(token===room.hostToken)return {room,identity:{role:'host'}};for(const player of room.players.values())if(token===player.token)return {room,identity:{role:'player',id:player.id}};}return null;}
@@ -40,10 +42,11 @@ function createServer({statePath=null}={}){
    if(pathname==='/api/join'&&req.method==='POST'){
     const data=await body(req),room=rooms.get(String(data.code||'').toUpperCase()),name=String(data.name||'').trim().slice(0,40);
     if(!room)return json(res,404,{error:'No se encontró la sala. Revisa el código.'});if(!name)return json(res,400,{error:'Escribe tu nombre.'});
+    if(data.avatar!==undefined&&!avatars.some(a=>a.file===data.avatar))return json(res,400,{error:'Elige uno de los avatares disponibles.'});
     if(room.phase==='playing')return json(res,409,{error:'La partida ya comenzó. Vuelve desde el dispositivo con el que ingresaste.'});
     if(room.players.size>=room.config.expectedPlayers)return json(res,409,{error:'La sala ya tiene los jugadores configurados.'});
-    const player={id:crypto.randomUUID(),token:crypto.randomUUID(),name,streams:new Set()};room.players.set(player.id,player);broadcast(room);
-    return json(res,201,{token:player.token,id:player.id,code:room.code,name});
+    const player={id:crypto.randomUUID(),token:crypto.randomUUID(),name,avatar:data.avatar||avatars[0].file,streams:new Set()};room.players.set(player.id,player);broadcast(room);
+    return json(res,201,{token:player.token,id:player.id,code:room.code,name,avatar:player.avatar});
    }
    const auth=authenticate(req,url);if(!auth)return json(res,401,{error:'Vuelve a conectar con la sala.'});
    const {room,identity}=auth;
@@ -84,7 +87,7 @@ function createServer({statePath=null}={}){
    }
    if(pathname==='/api/state'&&req.method==='GET'){
     const data=snapshot(room,identity);
-    if(identity.role==='host'){const port=server.address().port;data.joinUrls=Object.values(os.networkInterfaces()).flat().filter(i=>i.family==='IPv4'&&!i.internal).map(i=>'http://'+i.address+':'+port+'/play?room='+room.code);}
+    if(identity.role==='host'){const port=server.address().port;data.publicUrl=publicUrl;data.joinUrls=Object.values(os.networkInterfaces()).flat().filter(i=>i.family==='IPv4'&&!i.internal).map(i=>'http://'+i.address+':'+port+'/play?room='+room.code);}
     return json(res,200,data);
    }
    if(pathname==='/api/events'&&req.method==='GET'){
@@ -133,7 +136,7 @@ function createServer({statePath=null}={}){
   }
   const file=path.resolve(root,'.'+(pathname==='/play'?'/mobile.html':['/','/host'].includes(pathname)?'/index.html':pathname));
   const relative=path.relative(root,file);
-  if(!file.startsWith(root+path.sep)||(!['index.html','app.js','deal-animation.js','cards.js','styles.css','mobile.html','mobile.js','mobile.css'].includes(relative)&&!file.startsWith(path.join(root,'Resource')+path.sep)&&file!==path.join(root,'Rules','Reglas_Todo_o_Nada.md')&&file!==path.join(root,'Rules','Rules.png')))return json(res,403,{error:'Acceso no permitido'});
+  if(!file.startsWith(root+path.sep)||(!['index.html','avatars.js','app.js','deal-animation.js','cards.js','styles.css','mobile.html','mobile.js','mobile.css'].includes(relative)&&file!==path.join(root,'vendor','qrcode.js')&&!file.startsWith(path.join(root,'Resource')+path.sep)&&file!==path.join(root,'Rules','Reglas_Todo_o_Nada.md')&&file!==path.join(root,'Rules','Rules.png')))return json(res,403,{error:'Acceso no permitido'});
   const content=await fs.readFile(file);res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'});res.end(content);
  }catch(error){if(!res.headersSent)json(res,error.code==='ENOENT'?404:400,{error:error.code==='ENOENT'?'No encontrado':'Solicitud no válida'});else res.end();}});
  server.on('close',()=>{for(const room of rooms.values()){const clients=[...room.clients];room.clients.clear();for(const client of clients)client.res.end();}});
