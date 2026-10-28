@@ -1,0 +1,3 @@
+{"name":"todo-o-nada","version":"0.1.0","private":true,"scripts":{"start":"node server.js","check":"node --check app.js && node --check mobile.js && node --check server.js && node --check deck.js && node --check game.js && node --check deal-animation.js","test":"node --test tests/confirmations.test.js tests/game.test.js tests/reactions.test.js"}}
+
+
