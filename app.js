@@ -13,7 +13,34 @@ function render(){
 }
 function toast(message){$('toast').textContent=message;$('toast').classList.add('visible');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').classList.remove('visible'),3000);}
 function tone(){if(!sound)return;const ctx=new AudioContext(),o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);g.gain.setValueAtTime(.035,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.18);o.frequency.value=520;o.start();o.stop(ctx.currentTime+.18);o.onended=()=>ctx.close();}
-$('rulesButton').addEventListener('click',()=>$('rulesDialog').showModal());document.querySelector('.dialog-close').addEventListener('click',()=>$('rulesDialog').close());
+const rulesSections=[
+ ['El juego, el objetivo y los jugadores',[14,183,998,225]],
+ ['Cómo jugar: pantallas, turnos y retos',[14,409,998,304]],
+ ['Cartas especiales',[14,717,998,358]],
+ ['Acumulaciones, penalizaciones y final',[14,1078,998,448]]
+];
+let rulesStep=0,rulesOverview=false;
+function renderRulesTutorial(){
+ const [title,area]=rulesSections[rulesStep];
+ const bounds=rulesOverview?[0,0,1024,1536]:area;
+ $('rulesArtwork').setAttribute('viewBox',bounds.join(' '));
+ ['x','y','width','height'].forEach((attribute,index)=>$('rulesCropArea').setAttribute(attribute,bounds[index]));
+ $('rulesArtworkTitle').textContent=rulesOverview?'Reglas completas de Todo o Nada':title;
+ $('rulesStage').classList.toggle('overview',rulesOverview);$('rulesStage').scrollTop=0;
+ $('rulesTitle').textContent=rulesOverview?'Reglas del juego':title;
+ $('rulesProgress').textContent=rulesOverview?'La guía completa':`${rulesStep+1} / ${rulesSections.length}`;
+ $('rulesOverview').textContent=rulesOverview?'Volver al tutorial →':'Ver imagen completa ↗';
+ $('rulesPrevious').disabled=rulesOverview||rulesStep===0;$('rulesNext').disabled=rulesOverview||rulesStep===rulesSections.length-1;
+ $('rulesSteps').querySelectorAll('button').forEach((button,index)=>button.setAttribute('aria-current',String(!rulesOverview&&index===rulesStep)));
+ if(!matchMedia('(prefers-reduced-motion: reduce)').matches)$('rulesArtwork').animate([{opacity:0,transform:'translateY(12px) scale(.98)'},{opacity:1,transform:'none'}],{duration:300,easing:'ease-out'});
+}
+rulesSections.forEach(([title],index)=>{const button=document.createElement('button');button.type='button';button.textContent=index+1;button.setAttribute('aria-label',`${index+1}. ${title}`);button.addEventListener('click',()=>{rulesStep=index;rulesOverview=false;renderRulesTutorial();});$('rulesSteps').append(button);});
+$('rulesPrevious').addEventListener('click',()=>{if(rulesStep>0){rulesStep--;renderRulesTutorial();}});
+$('rulesNext').addEventListener('click',()=>{if(rulesStep<rulesSections.length-1){rulesStep++;renderRulesTutorial();}});
+$('rulesOverview').addEventListener('click',()=>{rulesOverview=!rulesOverview;renderRulesTutorial();});
+$('rulesButton').addEventListener('click',()=>{rulesStep=0;rulesOverview=false;renderRulesTutorial();$('rulesDialog').showModal();});
+$('rulesDialog').querySelector('.dialog-close').addEventListener('click',()=>$('rulesDialog').close());
+$('rulesDialog').addEventListener('keydown',event=>{if(event.key==='ArrowRight'&&!$('rulesNext').disabled){event.preventDefault();$('rulesNext').click();}if(event.key==='ArrowLeft'&&!$('rulesPrevious').disabled){event.preventDefault();$('rulesPrevious').click();}});
 $('rulesDialog').addEventListener('click',e=>{if(e.target===$('rulesDialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
 $('copyRoom').addEventListener('click',async()=>{try{await ensurePhoneRoom();await navigator.clipboard.writeText(currentRoomCode());toast('Código de sala copiado.');}catch{toast('Consulta la conexión en la sala de espera.');}});
 $('sound').addEventListener('click',()=>{sound=!sound;$('sound').setAttribute('aria-pressed',String(sound));$('sound').setAttribute('aria-label',sound?'Desactivar sonido':'Activar sonido');$('sound').textContent=sound?'♫':'♪';tone();toast(sound?'Sonido activado':'Sonido desactivado');});
