@@ -43,10 +43,16 @@ function renderMobile(state){
  if(state.lastTimeout?.id!==lastTimeoutSeen){lastTimeoutSeen=state.lastTimeout?.id||null;if(state.lastTimeout?.type==='dice'&&state.lastTimeout.playerId===playerSession?.id){if(el('mobileDiceDialog').open)el('mobileDiceDialog').close();suspendedDiceDialog=false;el('mobileStatus').textContent='Se agotó el tiempo del dado: recibiste una carta. No se hizo ninguna tirada.';}}
  const waiting=state.phase==='lobby'&&!isDesignPreview;
  const virtual=state.config?.mode==='virtual'&&!waiting;
+ const physical=!virtual&&!waiting;document.body.classList.toggle('is-presencial',physical);
+ el('physicalPhoneIdentity').hidden=!physical;el('physicalPhoneColor').hidden=!physical;
+ const me=state.players.find(p=>p.id===playerSession?.id);const ownAvatar=mobileAsset('Users/Sin Fondo/'+(me?.avatar||selectedAvatar));
+ if(physical){el('physicalPhoneAvatar').src=ownAvatar;el('physicalPhoneName').textContent=playerSession.name+' · Tú';el('physicalPhoneTopCard').hidden=!state.topCard;if(state.topCard)el('physicalPhoneTopCard').src=mobileAsset(state.topCard.file);el('physicalPhoneColorText').textContent='Color: '+(state.activeColors?.join(' / ')||state.activeColor||'Libre');}
  document.body.classList.toggle('is-virtual',virtual);el('mobileGame').classList.toggle('virtual-mode',virtual);el('virtualScene').hidden=!virtual;
  if(virtual)window.VirtualTable?.render(state,playerSession?.id);
  el('mobileLobby').hidden=!waiting;el('mobileGame').hidden=waiting;document.body.classList.toggle('is-playing',!waiting);
  if(waiting){
+  el('mobileLobbyCode').textContent=state.code;el('mobileLobbyAvatar').src=ownAvatar;el('mobileLobbyMode').textContent=state.config?.mode==='virtual'?'▱ MODO VIRTUAL':'♧ MODO PRESENCIAL';el('mobileLobbyHint').textContent=state.config?.mode==='virtual'?'La mesa se abrirá aquí al iniciar la partida.':'Mira la pantalla principal. La partida está por empezar.';
+  el('mobileLobbyRoster').replaceChildren();for(const player of state.players){const seat=document.createElement('div');seat.className='phone-wait-player'+(player.connected?' online':'');const avatar=document.createElement('img');avatar.src=mobileAsset('Users/Sin Fondo/'+(player.avatar||'pato-sinfondo.png'));avatar.alt='';const name=document.createElement('strong');name.textContent=player.name;seat.append(avatar,name);el('mobileLobbyRoster').append(seat);}
   el('mobileLobbyIdentity').textContent=playerSession.name+' · SALA '+state.code;
   el('mobileTask').hidden=true;el('completeTask').hidden=true;el('playerSelection').hidden=true;
   if(el('mobileCardDialog').open)el('mobileCardDialog').close();lastDisplayedTaskId=null;selectedTargetId=null;
@@ -166,7 +172,7 @@ async function connectMobile(){
 }
 const invitedRoom=(new URLSearchParams(location.search).get('room')||'').trim().toUpperCase();
 el('joinCode').value=invitedRoom;
-if(invitedRoom){el('joinMobile').querySelector('h1').textContent='ENTRAR A LA SALA '+invitedRoom;el('joinName').focus();}
+if(invitedRoom){el('joinMobile').querySelector('h1').textContent='Únete a la mesa';el('joinName').focus();}
 el('joinMobile').addEventListener('submit',async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{playerSession=await playerRequest('/api/join',{code:el('joinCode').value.trim().toUpperCase(),name:el('joinName').value.trim(),avatar:selectedAvatar});try{sessionStorage.setItem('todo-nada-phone',JSON.stringify(playerSession));}catch{}await connectMobile();}catch(error){el('mobileStatus').textContent=error.message;}finally{button.disabled=false;}});
 async function submitTask(fulfilled=true){
  if(submitting||!playerState?.pending)return;
@@ -201,7 +207,7 @@ matchMedia('(orientation: portrait) and (max-width:700px)').addEventListener('ch
  if(!event.matches&&suspendedDiceDialog){suspendedDiceDialog=false;el('mobileDiceDialog').showModal();}
 });
 el('mobileCardDialog').addEventListener('cancel',e=>e.preventDefault());
-async function leaveMobileRoom(){if(!isDesignPreview){try{await playerRequest('/api/leave',{});}catch(error){el('mobileStatus').textContent=error.message;return;}}mobileStream?.close();mobileStream=null;playerSession=null;playerState=null;try{sessionStorage.removeItem('todo-nada-phone');}catch{}el('mobileEntry').hidden=false;el('joinMobile').hidden=false;el('mobileGame').hidden=true;el('mobileLobby').hidden=true;document.body.classList.remove('is-playing','is-virtual');el('mobileGame').classList.remove('virtual-mode');el('virtualScene').hidden=true;el('mobileStatus').textContent='Saliste de la sala.';}
+async function leaveMobileRoom(){if(!isDesignPreview){try{await playerRequest('/api/leave',{});}catch(error){el('mobileStatus').textContent=error.message;return;}}mobileStream?.close();mobileStream=null;playerSession=null;playerState=null;try{sessionStorage.removeItem('todo-nada-phone');}catch{}el('mobileEntry').hidden=false;el('joinMobile').hidden=false;el('mobileGame').hidden=true;el('mobileLobby').hidden=true;document.body.classList.remove('is-playing','is-virtual','is-presencial');el('mobileGame').classList.remove('virtual-mode');el('virtualScene').hidden=true;el('mobileStatus').textContent='Saliste de la sala.';}
 el('leaveMobile').addEventListener('click',leaveMobileRoom);
 el('leaveMobileLobby').addEventListener('click',leaveMobileRoom);
 (async()=>{if(isDesignPreview)return;try{
@@ -229,7 +235,7 @@ function renderHand(preview){
  hand.classList.toggle('is-interactive',interactive);
  hand.setAttribute('aria-hidden',String(!interactive));
  const cards=preview?['Cartas normales/Coral/Coral-1.png','Cartas normales/Amarillo/Amarillo-2.png','Cartas normales/Turqueza/Turqesa-3.png','Cartas normales/Turqueza/Bloqueo_13.png','Cartas normales/Lila/Reversa-lila.png']:privateCards.length?privateCards.map(card=>card.file):Array(5).fill('Cartas normales/Carta-Trasera2.png');
- el('handCaption').textContent=preview?'Mano de ejemplo · vista de diseño':privateCards.length?privateCards.length+' cartas · Color en juego: '+(playerState.activeColors?.join(' / ')||playerState.activeColor||'libre'):'Esperando el reparto';
+ el('handCaption').textContent=document.body.classList.contains('is-presencial')?'☝ Toca una carta para jugarla.':preview?'Mano de ejemplo · vista de diseño':privateCards.length?privateCards.length+' cartas · Color en juego: '+(playerState.activeColors?.join(' / ')||playerState.activeColor||'libre'):'Esperando el reparto';
  const signature=JSON.stringify([preview,...(privateCards.length?privateCards.map(card=>card.id):cards)]);
  if(hand.dataset.signature===signature)return;
  hand.dataset.signature=signature;hand.replaceChildren();

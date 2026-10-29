@@ -1,11 +1,14 @@
 const escapeHTML=value=>String(value).replace(/[&<>"']/g,character=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
 const asset=file=>'/Resource/'+file.split('/').map(encodeURIComponent).join('/');
 const players=[{name:'Dani',avatar:'pato-sinfondo.png',cards:5},{name:'Vale',avatar:'fantasmacute-sinfondo.png',cards:3},{name:'Nico',avatar:'calavera-sinfondo.png',cards:6},{name:'Majo',avatar:'caraderretida-sinfondo.png',cards:1}];
-let active=0,sound=false,roomState=null;
+let active=0,sound=false,roomState=null,hostSeatPage=0;
 const $=id=>document.getElementById(id);
 function render(){
  $('players').innerHTML=players.map((p,i)=>`<div class="player ${i===active&&!p.eliminated&&roomState?.phase!=='finished'?'active':''}" ${i===active&&!p.eliminated&&roomState?.phase!=='finished'?'aria-current="true"':''}>${i===active&&!p.eliminated&&roomState?.phase!=='finished'?'<span class="active-label">SU TURNO</span>':''}<div class="avatar"><img src="${asset('Users/Sin Fondo/'+p.avatar)}" alt=""></div><div><strong>${escapeHTML(p.name)}</strong><p class="${p.cards===1?'one-card':''}">${p.eliminated?'Eliminado · '+p.cards+' cartas':p.cards===null?(p.connected?'Conectado':'Sin conexión'):`<b>${p.cards}</b> ${p.cards===1?'carta · ¡Última!':'cartas'}`}</p></div></div>`).join('');
  document.querySelector('.players-heading h2 span').textContent=players.length+' jugadores';
+ const physical=document.body.dataset.mode==='presencial',pageCount=Math.max(1,Math.ceil(players.length/10));hostSeatPage%=pageCount;
+ document.querySelectorAll('#players>.player').forEach((seat,i)=>{const index=i-hostSeatPage*10,side=index%2,row=Math.floor(index/2),rows=Math.ceil(Math.min(10,players.length-hostSeatPage*10)/2);seat.hidden=physical&&(index<0||index>=10);seat.style.setProperty('--seat-x',side?'86%':'14%');seat.style.setProperty('--seat-y',(rows===1?50:23+row*57/(rows-1))+'%');});
+ if($('hostSeatsMore')){$('hostSeatsMore').hidden=!physical||pageCount===1;$('hostSeatsMore').textContent='Ver más jugadores · '+(hostSeatPage+1)+' / '+pageCount;}
  if(!players.length){$('turnName').textContent='Esperando jugadores';$('nextPlayer').textContent='';return;}
  $('turnName').textContent=players[active].name;$('turnAvatar').src=asset('Users/Sin Fondo/'+players[active].avatar);
  const alive=players.filter(player=>!player.eliminated),position=alive.findIndex(player=>player.id===players[active].id);
@@ -43,6 +46,7 @@ $('rulesDialog').querySelector('.dialog-close').addEventListener('click',()=>$('
 $('rulesDialog').addEventListener('keydown',event=>{if(event.key==='ArrowRight'&&!$('rulesNext').disabled){event.preventDefault();$('rulesNext').click();}if(event.key==='ArrowLeft'&&!$('rulesPrevious').disabled){event.preventDefault();$('rulesPrevious').click();}});
 $('rulesDialog').addEventListener('click',e=>{if(e.target===$('rulesDialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
 $('copyRoom').addEventListener('click',async()=>{try{await ensurePhoneRoom();await navigator.clipboard.writeText(currentRoomCode());toast('Código de sala copiado.');}catch{toast('Consulta la conexión en la sala de espera.');}});
+$('hostSeatsMore').addEventListener('click',()=>{hostSeatPage++;render();});
 $('sound').addEventListener('click',()=>{sound=!sound;$('sound').setAttribute('aria-pressed',String(sound));$('sound').setAttribute('aria-label',sound?'Desactivar sonido':'Activar sonido');$('sound').textContent=sound?'♫':'♪';tone();toast(sound?'Sonido activado':'Sonido desactivado');});
 $('fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{toast('La pantalla completa no está disponible en esta ventana.');}});
 render();
@@ -65,6 +69,7 @@ function renderLobby(){
  const roster=roomState?.players||[],online=roster.filter(p=>p.connected),expected=roomState?.config?.expectedPlayers||0;
  $('lobbyCount').textContent=online.length+' / '+(expected||'—');
  const mode=roomState?.config?.mode==='virtual'?'Virtual':'Presencial';$('lobbyModeBadge').textContent=(mode==='Virtual'?'▱':'♧')+' MODO '+mode.toUpperCase();$('lobbyModeText').textContent=(mode==='Virtual'?'▱':'♧')+' Modo '+mode.toLowerCase();
+ document.body.dataset.mode=mode.toLowerCase();document.querySelector('.lobby-intro h1').textContent=mode==='Presencial'?'Conéctense y tomen asiento':'La mesa casi está lista';document.querySelector('.lobby-intro p').textContent=mode==='Presencial'?'Todos en la misma pantalla. Tu mano en tu celular.':'Invita a tus amigos y prepárense para jugar.';
  $('waitingPlayers').replaceChildren();
  roster.forEach((p,i)=>{const item=document.createElement('div');item.className='waiting-player'+(p.connected?' online':' offline');const image=document.createElement('img');image.src=asset('Users/Sin Fondo/'+(p.avatar||PLAYER_AVATARS[i%PLAYER_AVATARS.length].file));image.alt='';const name=document.createElement('strong');name.textContent=p.name;const status=document.createElement('span');status.textContent=p.connected?'Conectado':'Sin conexión';item.append(image,name,status);$('waitingPlayers').append(item);});
  for(let i=roster.length;i<Math.min(expected||4,10);i++){const slot=document.createElement('div');slot.className='waiting-slot';slot.innerHTML='<span aria-hidden="true">＋</span><small>Esperando</small>';$('waitingPlayers').append(slot);}
@@ -83,10 +88,10 @@ function route(){
  if(view==='lobby')renderLobby();
  window.scrollTo(0,0);
 }
-$('createRoom').addEventListener('click',()=>configDialog.showModal());
+$('createRoom').addEventListener('click',()=>{configDialog.dispatchEvent(new Event('change'));configDialog.showModal();});
 $('homeJoin').addEventListener('submit',event=>{event.preventDefault();const code=$('homeJoinCode').value.trim().toUpperCase();if(/^[A-Z0-9]{5}$/.test(code))location.href='/play?room='+encodeURIComponent(code);});
 $('homeRules').addEventListener('click',()=>$('rulesButton').click());
-$('changeRoomConfig').addEventListener('click',()=>{$('expectedPlayers').value=roomState?.config?.expectedPlayers||4;configDialog.querySelector('[value="'+(roomState?.config?.mode||'presencial')+'"]').checked=true;configDialog.querySelector('.config-network-note').textContent='Al confirmar se creará una nueva sala con otro código. Comparte la nueva invitación con tus amigos.';configDialog.showModal();});
+$('changeRoomConfig').addEventListener('click',()=>{$('expectedPlayers').value=roomState?.config?.expectedPlayers||4;configDialog.querySelector('[value="'+(roomState?.config?.mode||'presencial')+'"]').checked=true;configDialog.querySelector('.config-network-note').textContent='Al confirmar se creará una nueva sala con otro código. Comparte la nueva invitación con tus amigos.';configDialog.dispatchEvent(new Event('change'));configDialog.showModal();});
 $('startDemo').addEventListener('click',async()=>{if($('startDemo').disabled)return;$('startDemo').disabled=true;try{await roomRequest('/api/start',{});location.hash='table';}catch(error){toast(error.message);renderLobby();}});
 $('lobbyCopy').addEventListener('click',async()=>{try{await ensurePhoneRoom();await navigator.clipboard.writeText(currentRoomCode());toast('Código de sala copiado.');}catch{toast('No se pudo copiar el código.');}});
 window.addEventListener('hashchange',route);route();
@@ -105,7 +110,7 @@ function showPlayerReaction(name,emoji,id=null,playSound=true,playerId=null){
  const item=document.createElement('div');item.className='public-reaction reaction-'+reactionSides.get(key);
  const face=document.createElement('span');face.textContent=emoji;
  const sender=document.createElement('small');sender.textContent=String(name||'Jugador').slice(0,40);
- item.append(face,sender);feed.append(item);
+ const avatar=document.createElement('img');avatar.className='reaction-sender-avatar';avatar.src=asset('Users/Sin Fondo/'+(roomState?.players?.find(p=>p.id===playerId||p.name===name)?.avatar||'pato-sinfondo.png'));avatar.alt='';item.append(avatar,sender,face);feed.append(item);
  if(atBottom)feed.scrollTop=feed.scrollHeight;
  if(playSound)tone();
 }
@@ -242,7 +247,8 @@ async function roomRequest(endpoint,data){
  const result=await response.json();if(!response.ok)throw Error(result.error||'No se pudo conectar.');return result;
 }
 function applyRoomState(state){
- roomState=state;window.updateActionClock?.(state);
+ document.body.dataset.mode=state.config?.mode||'presencial';
+ roomState=state;document.body.dataset.phase=state.phase;window.updateActionClock?.(state);
  syncReactionHistory(state);
  window.playDealAnimation?.(state);
  const avatarNames=['pato-sinfondo.png','fantasmacute-sinfondo.png','calavera-sinfondo.png','caraderretida-sinfondo.png'];
@@ -348,8 +354,11 @@ if(['#table','#lobby'].includes(location.hash))ensurePhoneRoom().catch(()=>{});
 
 
 const configDialog=document.createElement('dialog');configDialog.id='roomConfigDialog';configDialog.setAttribute('aria-labelledby','roomConfigTitle');
-configDialog.innerHTML='<form id="roomConfigForm"><span class="eyebrow">ANTES DE EMPEZAR</span><h2 id="roomConfigTitle">Configura tu sala</h2><label class="config-label" for="expectedPlayers">¿Cuántos jugadores serán?</label><input id="expectedPlayers" type="number" min="2" max="100" step="1" value="4" required><fieldset><legend>¿Cómo van a jugar?</legend><label class="mode-option"><input type="radio" name="roomMode" value="presencial" checked><span><b>Presencial</b><small>Todos reunidos, cada uno con su celular.</small></span></label><label class="mode-option"><input type="radio" name="roomMode" value="virtual"><span><b>Virtual</b><small>Desde distintos lugares. Las elecciones se confirman en el móvil.</small></span></label></fieldset><p class="config-network-note">Comparte el enlace o el QR de la sala para que cada jugador entre desde su celular.</p><p id="roomConfigError" role="status"></p><button class="relief-button" type="submit">CREAR SALA</button><button id="cancelRoomConfig" class="profile-cancel" type="button">Cancelar</button></form>';
+configDialog.innerHTML='<form id="roomConfigForm"><div class="config-brand"><img src="/Resource/Logo/logo-vertical.png" alt="Todo o Nada"><span id="configModeBadge">♧ MODO PRESENCIAL</span><button id="cancelRoomConfig" type="button" aria-label="Volver al inicio">← Volver</button></div><div class="config-body"><h2 id="roomConfigTitle">Prepara tu mesa</h2><p id="configSubtitle">Una pantalla para todos. Tu mano en tu celular.</p><fieldset class="config-modes"><legend class="sr-only">¿Cómo van a jugar?</legend><label class="mode-option"><input type="radio" name="roomMode" value="presencial" checked><span class="mode-illustration" aria-hidden="true">♧</span><span><b>Presencial</b><small>Una pantalla para todos.<br>Tu mano en tu celular.</small></span><i aria-hidden="true">✓</i></label><label class="mode-option"><input type="radio" name="roomMode" value="virtual"><span class="mode-illustration" aria-hidden="true">▱</span><span><b>Virtual</b><small>Cada uno juega<br>desde su dispositivo.</small></span><i aria-hidden="true">✓</i></label></fieldset><div class="config-player-count"><span class="mode-illustration" aria-hidden="true">♧</span><label for="expectedPlayers"><b>NÚMERO DE JUGADORES</b><small>Entre 2 y 100 jugadores.</small></label><div class="player-stepper"><button id="fewerPlayers" type="button" aria-label="Menos jugadores">−</button><input id="expectedPlayers" aria-label="Número de jugadores" type="number" min="2" max="100" step="1" value="4" required><button id="morePlayers" type="button" aria-label="Más jugadores">＋</button></div></div><p class="config-network-note">Comparte el enlace o el QR de la sala para que cada jugador entre desde su dispositivo.</p><p id="roomConfigError" role="status"></p><button class="relief-button" type="submit">CREAR SALA <span>→</span></button></div></form>';
 document.body.append(configDialog);
+configDialog.querySelectorAll('.mode-illustration').forEach((icon,i)=>icon.innerHTML=lobbyIcon(i===1?'devices':'people'));document.querySelector('.physical-host-badge').innerHTML=lobbyIcon('people')+' MODO PRESENCIAL';
+for(const [id,step] of [['fewerPlayers',-1],['morePlayers',1]])$(id).addEventListener('click',()=>{const input=$('expectedPlayers');input.value=Math.min(100,Math.max(2,(Number(input.value)||2)+step));});
+configDialog.addEventListener('change',()=>{const virtual=configDialog.querySelector('[name="roomMode"]:checked').value==='virtual';$('configModeBadge').textContent=virtual?'▱ MODO VIRTUAL':'♧ MODO PRESENCIAL';$('roomConfigTitle').textContent=virtual?'Prepara tu sala':'Prepara tu mesa';$('configSubtitle').textContent=virtual?'Cada jugador tiene la mesa completa en su dispositivo.':'Una pantalla para todos. Tu mano en tu celular.';});
 $('cancelRoomConfig').addEventListener('click',()=>configDialog.close());
 $('roomConfigForm').addEventListener('submit',async event=>{
  event.preventDefault();const button=event.submitter;button.disabled=true;$('roomConfigError').textContent='';

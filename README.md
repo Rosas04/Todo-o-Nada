@@ -107,3 +107,9 @@ Tiempos totales: turno normal 25 s, acumulación 20 s, pregunta escrita 60 s, re
 Al vencer una pregunta o reto, se espera la evaluación final del emisor; no se aplica castigo automáticamente. En turno normal se coge una carta y se pasa (si ya se cogió, no se cobra otra). Las acumulaciones de cartas se reciben completas y se pasa. En shots se espera confirmación. El dado vencido añade una carta y cierra la acción sin sortear un número. Las elecciones vencidas quedan pendientes de completarse, sin elegir por el jugador.
 
 Sugerir pregunta o reto utiliza un catálogo de 40 consignas de fiesta para adultos, con criterios explícitos y sin repetir durante la partida. Una nueva ronda restablece el catálogo. No responder una llamada o no prestar algo no equivale a negativa: las consignas indican el intento o una alternativa que cuenta como cumplimiento. El emisor marca Cumplió cuando se cumple la alternativa acordada; no se añade un segundo castigo.
+
+## Diseño presencial y configuración
+
+La configuración usa tarjetas de modalidad y un selector de 2 a 100 jugadores con botones de menos y más. El lobby presencial muestra a los participantes conectados, su avatar, el código y el QR. La pantalla principal coloca avatares y cantidades alrededor de una mesa con mazo, descarte, color, turno, contador y reacciones. Las salas con más de diez participantes permiten recorrer los asientos con Ver más jugadores.
+
+El celular mantiene una mano privada en horizontal, con ingreso y selección de avatar, espera con participantes conectados, color activo, reacciones y las acciones del turno. Se conservan los permisos de evaluación de preguntas y retos, las sugerencias, las acumulaciones y el dado físico.
