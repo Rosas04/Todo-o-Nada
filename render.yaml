@@ -3,7 +3,7 @@ services:
   - type: web
     name: todo-o-nada
     runtime: node
-    plan: starter
+    plan: free
     branch: main
     numInstances: 1
     buildCommand: node scripts/check.js && node --test tests/*.test.js
@@ -13,9 +13,5 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DATA_DIR
-        value: /var/data
-    disk:
-      name: partidas
-      mountPath: /var/data
-      sizeGB: 1
+      - key: STORAGE_MODE
+        value: ephemeral

@@ -9,8 +9,27 @@ test('Render runtime uses its port, persistent disk, public address and trusted 
  assert.equal(runtimeConfig({PUBLIC_URL:'https://custom.example',RENDER_EXTERNAL_URL:'https://render.example'}).publicUrl,'https://custom.example');
  assert.equal(runtimeConfig({}).port,5173);assert.equal(runtimeConfig({}).trustProxy,false);
  assert.throws(()=>runtimeConfig({PORT:'not-a-port'}),/PORT/);
- assert.throws(()=>runtimeConfig({RENDER:'true'}),/DATA_DIR/);
+ assert.throws(()=>runtimeConfig({RENDER:'true'}),/STORAGE_MODE/);
  assert.throws(()=>runtimeConfig({PUBLIC_URL:'javascript:bad'}),/PUBLIC_URL/);
+});
+
+test('free demo keeps rooms in memory, reconnects before restart and starts fresh after restart',async()=>{
+ const config=runtimeConfig({RENDER:'true',STORAGE_MODE:'ephemeral',PORT:'0',RENDER_EXTERNAL_URL:'https://demo.onrender.com'});
+ assert.equal(config.statePath,null);assert.equal(config.trustProxy,true);
+ assert.equal(runtimeConfig({STORAGE_MODE:'ephemeral',DATA_DIR:'/unused'}).statePath,null);
+ assert.throws(()=>runtimeConfig({STORAGE_MODE:'unknown'}),/STORAGE_MODE/);
+ let server=createServer(config);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const api=async(route,{token,data}={})=>fetch('http://127.0.0.1:'+server.address().port+route,{method:data===undefined?'GET':'POST',headers:{Origin:config.publicUrl,'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(data===undefined?{}:{body:JSON.stringify(data)})});
+ try{
+  const host=await (await api('/api/rooms',{data:{}})).json();
+  const player=await (await api('/api/join',{data:{code:host.code,name:'Demo',avatar:'copa-sinfondo.png'}})).json();
+  assert.equal((await api('/api/state',{token:player.token})).status,200);
+  const state=await (await api('/api/state',{token:host.token})).json();assert.equal(state.players[0].avatar,'copa-sinfondo.png');assert.equal(state.publicUrl,config.publicUrl);
+  await new Promise(resolve=>server.close(resolve));server=createServer(config);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  assert.equal((await api('/api/state',{token:host.token})).status,401);
+  assert.equal((await api('/api/join',{data:{code:host.code,name:'Nueva'}})).status,404);
+  assert.equal((await api('/api/rooms',{data:{}})).status,201);
+ }finally{await new Promise(resolve=>server.close(resolve));}
 });
 
 test('HTTPS deployment supports room creation, private hands, SSE, restart and reconnection',async()=>{
