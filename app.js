@@ -71,6 +71,7 @@ function route(){
  $('homeScreen').hidden=view!=='home';$('lobbyScreen').hidden=view!=='lobby';
  document.body.classList.toggle('welcome-mode',view!=='table');
  document.body.classList.toggle('lobby-mode',view==='lobby');
+ document.body.dataset.screen=view;
  document.title='TODO O NADA · '+({home:'Inicio',lobby:'Sala de espera',table:'La mesa'}[view]);
  if(view==='lobby')renderLobby();
  window.scrollTo(0,0);

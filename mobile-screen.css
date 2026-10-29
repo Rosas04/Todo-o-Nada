@@ -1,0 +1,83 @@
+html,body{height:100%;overflow:hidden}body{height:100dvh;min-height:0}
+body main,body.is-playing main{height:100dvh;min-height:0;padding:12px max(12px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom));display:flex;flex-direction:column;overflow:hidden}
+#mobileStatus{flex:0 0 auto;margin:5px 0 0;font-size:9px;min-height:13px}
+.mobile-entry{flex:1;min-height:0;padding:0;gap:clamp(8px,2dvh,20px);justify-content:center;width:min(350px,100%)}
+.entry-brand>img{width:clamp(90px,19dvh,175px);max-height:19dvh;object-fit:contain}
+.entry-brand p{font-size:9px;margin:4px 0 0}
+.join-panel{padding:clamp(14px,2.5dvh,24px) 20px;border-radius:22px}
+.join-panel h1{margin:0 0 14px;font-size:16px}
+.join-panel label{font-size:10px;margin-bottom:8px}
+.join-panel .name-label{margin:14px 0 8px}
+.join-field{padding:4px;border-radius:14px}
+.join-field input{height:32px;font-size:14px}
+.join-field>span{width:30px;height:30px}
+.avatar-picker{margin:16px 0}.avatar-picker legend{margin-bottom:9px;font-size:10px}
+.avatar-options{gap:8px}.avatar-options img{height:clamp(42px,7dvh,61px);padding:6px}
+.join-panel>.relief{margin-top:12px;min-height:40px;padding:10px 18px;font-size:14px}
+.mobile-lobby{flex:1;min-height:0;padding:0;gap:clamp(10px,3dvh,25px);justify-content:center;width:min(390px,100%)}
+.mobile-lobby>img{width:clamp(100px,21dvh,165px);max-height:21dvh;object-fit:contain}
+.mobile-lobby-card{padding:clamp(16px,3dvh,28px)}
+.mobile-lobby-card h1{font-size:clamp(18px,3dvh,24px)}
+.mobile-game{flex:1;height:100%;min-height:0;margin:0 auto;padding:14px;grid-template-columns:40px minmax(0,1fr) clamp(130px,18vw,200px);gap:18px;overflow:hidden}
+.personal-table{min-height:0;gap:12px}
+.turn-chip{flex:0 0 auto;padding:8px 12px}
+.hand-surface{flex:1;min-height:0;padding:20px 8px;overflow:hidden}
+.waiting-hand{min-height:0;width:100%}
+.hand-fan{--fan-spread:min(200px,30vw);height:clamp(100px,36dvh,260px);max-width:100%}
+.hand-card,.hand-fan img{height:clamp(95px,32dvh,235px);width:auto;aspect-ratio:126/195}
+.hand-card img{width:100%;height:100%}
+#handCaption{font-size:9px;margin:16px 0 0}
+.mobile-player{flex:0 0 auto;font-size:8px}
+.mobile-actions{min-height:0;gap:clamp(10px,2dvh,20px)}
+.game-logo{max-height:clamp(55px,17dvh,135px)}
+.action-stack{gap:10px}
+.action-button{min-height:48px;padding:10px;gap:8px}
+.action-button>span{font-size:26px}.action-button b{font-size:11px}
+.complete-button{min-height:42px;padding:10px;font-size:10px}
+.mobile-reactions{margin-top:0;padding-top:10px}.mobile-reactions h2{font-size:9px}
+.emoji-grid{gap:6px}.emoji-grid button{width:34px;height:34px;font-size:21px}
+#mobileRoster{flex:1;min-height:0;max-height:none}
+.mobile-card-dialog,.mobile-dice-dialog{max-height:94dvh;max-width:96vw;overflow-y:auto}
+@media(orientation:portrait){
+ .mobile-game{grid-template-columns:34px minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;gap:12px;padding:12px}
+ .player-rail{grid-row:1/3}.personal-table{min-height:0}
+ .mobile-actions{grid-column:2;display:grid;grid-template-columns:65px minmax(0,1fr);gap:10px}
+ .game-logo{width:65px;max-height:65px;grid-column:1;grid-row:1;align-self:center}
+ .action-stack{grid-column:2;display:flex;flex-flow:row wrap;gap:7px}
+ .action-stack button{flex:1;min-width:75px}.action-button{min-height:48px;padding:8px 5px}
+ .action-button>span{font-size:21px}.action-button b{font-size:9px}
+ .mobile-reactions{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:8px}
+ .mobile-reactions h2{margin:0}.emoji-grid{display:flex}
+ .hand-fan{height:clamp(120px,34dvh,260px);--fan-spread:min(200px,25vw)}
+ .hand-card,.hand-fan img{height:clamp(110px,29dvh,215px)}
+ .hand-card img{height:100%}
+}
+@media(orientation:landscape) and (max-height:600px){
+ .mobile-entry{display:grid;grid-template-columns:150px minmax(0,370px);width:min(650px,100%);max-width:650px;gap:22px;align-content:center;align-items:center}
+ .entry-brand>img{width:140px;max-height:40dvh}.entry-brand p{font-size:8px}
+ .join-panel{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;padding:14px}
+ .join-panel h1{grid-column:1/-1;font-size:14px;margin:0 0 3px}
+ .join-panel>label[for=joinCode]{grid-column:1;grid-row:2;margin:0}
+ .join-panel>.join-field:not(.name-field){grid-column:1;grid-row:3}
+ .join-panel .name-label{grid-column:2;grid-row:2;margin:0}
+ .join-panel .name-field{grid-column:2;grid-row:3}
+ .avatar-picker{grid-column:1/-1;margin:5px 0}.avatar-picker legend{margin-bottom:5px}
+ .avatar-options{grid-template-columns:repeat(6,1fr);gap:5px}.avatar-options img{height:42px;padding:5px}
+ .join-panel>.relief{grid-column:1/-1;margin:0;min-height:34px;padding:7px}
+ .mobile-game{padding:10px;gap:12px;grid-template-columns:32px minmax(0,1fr) 140px}
+ .personal-table{gap:7px}.turn-chip{padding:5px 10px}.hand-surface{padding:18px 5px 10px}
+ .hand-fan{height:clamp(85px,40dvh,180px)}.hand-card,.hand-fan img{height:clamp(85px,36dvh,160px)}.hand-card img{height:100%}
+ #handCaption{font-size:8px;margin:10px 0 0}.mobile-actions{gap:8px}
+ .game-logo{max-height:65px}.action-button{min-height:40px;padding:7px}.action-stack{gap:6px}
+ .action-button b{font-size:9px}.mobile-reactions{padding-top:6px}.emoji-grid button{width:28px;height:28px;font-size:18px}
+ .mobile-lobby{min-height:0;grid-template-columns:130px minmax(0,1fr);gap:12px 25px;align-content:center;width:min(600px,100%)}
+ .mobile-lobby>img{max-height:35dvh}.mobile-lobby-card{padding:14px}.mobile-lobby-card h1{font-size:20px}.mobile-lobby-card p{font-size:11px}
+}
+@media(max-height:650px) and (orientation:portrait){
+ .entry-brand>img{width:90px;max-height:15dvh}.entry-brand p{display:none}.mobile-entry{gap:8px}
+ .join-panel{padding:12px 16px}.join-panel h1{margin-bottom:8px;font-size:14px}.join-panel .name-label{margin-top:8px}
+ .avatar-picker{margin:10px 0}.avatar-options img{height:40px}.join-panel>.relief{margin-top:8px}
+}
+
+.join-panel{min-height:0;overflow-y:auto;scrollbar-width:thin}.entry-brand{flex:0 0 auto}
+

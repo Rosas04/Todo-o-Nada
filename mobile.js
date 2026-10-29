@@ -166,7 +166,7 @@ function renderHand(preview){
  cards.forEach((file,i)=>{
   const card=document.createElement(interactive?'button':'span');card.className='hand-card';
   const midpoint=(cards.length-1)/2,step=Math.min(29,200/Math.max(1,cards.length-1)),angleStep=Math.min(10,60/Math.max(1,cards.length-1));
-  card.style.setProperty('--angle',(i-midpoint)*angleStep+'deg');card.style.setProperty('--offset',(i-midpoint)*step+'px');card.style.setProperty('--stack',i+1);
+  card.style.setProperty('--angle',(i-midpoint)*angleStep+'deg');card.style.setProperty('--offset','calc(var(--fan-spread, 200px) * '+((i-midpoint)*step/200)+')');card.style.setProperty('--stack',i+1);
   card.style.setProperty('--deal-order',i);
   const img=document.createElement('img');img.src=mobileAsset(file);img.alt='';img.draggable=false;card.append(img);
   if(interactive){
