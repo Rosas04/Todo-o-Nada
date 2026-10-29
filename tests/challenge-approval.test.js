@@ -13,7 +13,8 @@ test('only the sender evaluates questions, challenges and truth-or-dare; rejecti
    assert.equal((await api('/api/play','token0',{cardId:played.id})).status,200);
    const sender=(await api('/api/state','token0')).body,responder=(await api('/api/state','token1')).body;
    assert.equal(sender.pending.judgeId,'p0');assert.equal(sender.pending.playerId,'p1');assert.equal(responder.pending.id,sender.pending.id);
-   assert.equal((await api('/api/state','token2')).body.pending,null);
+   const observer=(await api('/api/state','token2')).body;
+   assert.equal(observer.pending,null);assert.equal(observer.publicAction.id,sender.pending.id);assert.equal(observer.publicAction.text,sender.pending.text);assert.equal(observer.publicAction.judgeId,'p0');assert.equal(observer.players.some(p=>'hand' in p||'token' in p),false);
    const taskId=sender.pending.id;
    assert.equal((await api('/api/complete','token1',{taskId,fulfilled:true})).status,403);
    assert.equal((await api('/api/complete','host',{taskId,fulfilled:true})).status,403);

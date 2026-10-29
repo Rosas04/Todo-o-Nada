@@ -1,6 +1,6 @@
 # TODO O NADA
 
-Juego web con pantalla principal del árbitro y controles privados en el celular. Preparado para ejecución local o publicación en Render.
+Juego web con pantalla principal del árbitro y controles privados en el celular en modo presencial, y mesa completa para cada participante en modo virtual. Preparado para ejecución local o publicación en Render.
 
 ## Publicar en Render
 
@@ -72,9 +72,17 @@ node --check deal-animation.js
 node --test tests/confirmations.test.js tests/game.test.js tests/reactions.test.js tests/invitations.test.js tests/avatars.test.js
 ```
 
-50 pruebas: privacidad y persistencia, ocho cartas, permisos de turno/propiedad/color/tipo, doble robo simultáneo, una carta por turno, pasar después de robar, umbral 25/26, eliminación por acumulación, suma de penalizaciones y reinicio de la cuenta al cumplirlas, turnos que saltan eliminados, dado virtual/físico, selecciones, victoria, historial de varias reacciones y limpieza al iniciar/terminar. En navegador se verificaron la animación inicial, robo con Pasar turno y dos reacciones del mismo jugador conservadas al recargar.
+53 pruebas: privacidad y persistencia, ocho cartas, permisos de turno/propiedad/color/tipo, doble robo simultáneo, una carta por turno, pasar después de robar, umbral 25/26, eliminación por acumulación, suma de penalizaciones y reinicio de la cuenta al cumplirlas, turnos que saltan eliminados, dado virtual/físico, selecciones, victoria, historial de varias reacciones y limpieza al iniciar/terminar. Incluyen posiciones relativas de la mesa virtual, salas de diez y cien participantes, historial público virtual y privacidad de las manos. En navegador se verificaron las mesas de cuatro y diez jugadores, la evaluación del emisor y el lanzamiento del dado.
 
-Vistas visuales sin conexión: /play?preview=hand, /play?preview=task y /play?preview=selection.
+Vistas visuales sin conexión: /play?preview=hand, /play?preview=task y /play?preview=selection. Mesa virtual: /play?preview=virtual, /play?preview=virtual&players=10, /play?preview=virtual-task, /play?preview=virtual-judge y /play?preview=virtual-dice.
+
+## Mesa virtual
+
+La modalidad configurada en la sala decide la vista automáticamente. En virtual cada participante ve la mesa ovalada desde su posición: su avatar y mano abajo, oponentes alrededor con cartas boca abajo, mazo y descarte al centro, dirección, colores activos, acumulaciones, turno y contador. Hasta diez jugadores aparecen juntos; en salas mayores se recorren los demás con «Ver más jugadores».
+
+Las cartas se juegan directamente desde la mano y el mazo central permite coger respetando las mismas reglas del servidor. Preguntas, retos, elecciones, sugerencias y evaluación de Cumplió/No cumplió conservan sus permisos y tiempos. El resto puede consultar la consigna pública, sin recibir controles de evaluación ni manos ajenas. Los resultados del dado virtual se muestran animados a todos. Las reacciones se conservan junto a los avatares y en el historial de la mesa.
+
+El modo presencial mantiene la pantalla principal y el teléfono como control privado. El fondo virtual está incluido en Resource/Backgrounds/virtual-room.png; no requiere servicios externos.
 
 ## Invitaciones por enlace y QR
 
@@ -88,7 +96,7 @@ Al unirse, cada jugador elige uno de los seis avatares transparentes de Resource
 
 ## Evaluación y orientación móvil
 
-Las preguntas, los retos y Verdad o reto guardan al emisor como evaluador. Solo su sesión puede marcar Cumplido o No cumplido. El receptor ve la carta y espera; terceros no reciben esa carta privada. No cumplido activa el dado para el receptor y respeta la modalidad virtual/presencial. Las evaluaciones repetidas no cambian el resultado ya registrado.
+Las preguntas, los retos y Verdad o reto guardan al emisor como evaluador. Solo su sesión puede marcar Cumplido o No cumplido. El receptor ve la carta y espera; los demás participantes virtuales reciben solo la consigna pública, sin acceso a la evaluación ni a las manos. No cumplido activa el dado para el receptor y respeta la modalidad virtual/presencial. Las evaluaciones repetidas no cambian el resultado ya registrado.
 
 El teléfono se usa en horizontal. En vertical aparece una guía para girarlo, también al ingresar. El botón de pantalla completa intenta fijar orientación horizontal si el navegador lo permite; en los demás casos se gira el dispositivo manualmente.
 

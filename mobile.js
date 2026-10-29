@@ -2,7 +2,9 @@ let playerSession=null,playerState=null,mobileStream=null,submitting=false,lastD
 let gameActionBusy=false,lastDiceResultId=null,diceAnimationTimer=null,mobileDealing=false,reactionBusy=false;
 let lastTimeoutSeen=null;
 const mobilePreview=new URLSearchParams(location.search).get('preview');
+const isDesignPreview=['hand','task','selection','virtual','virtual-task','virtual-judge','virtual-dice'].includes(mobilePreview);
 const el=id=>document.getElementById(id);
+window.VirtualTable?.setHandlers({draw:()=>el('mobileDraw').click(),leave:()=>leaveMobileRoom()});
 let selectedAvatar=PLAYER_AVATARS[0].file;
 try{const saved=localStorage.getItem('todo-nada-avatar');if(PLAYER_AVATARS.some(avatar=>avatar.file===saved))selectedAvatar=saved;}catch{}
 PLAYER_AVATARS.forEach(avatar=>{
@@ -39,7 +41,10 @@ function renderSuggestions(task){
 function renderMobile(state){
  playerState=state;window.updateActionClock?.(state);el('mobileEntry').hidden=true;el('joinMobile').hidden=true;
  if(state.lastTimeout?.id!==lastTimeoutSeen){lastTimeoutSeen=state.lastTimeout?.id||null;if(state.lastTimeout?.type==='dice'&&state.lastTimeout.playerId===playerSession?.id){if(el('mobileDiceDialog').open)el('mobileDiceDialog').close();suspendedDiceDialog=false;el('mobileStatus').textContent='Se agotó el tiempo del dado: recibiste una carta. No se hizo ninguna tirada.';}}
- const waiting=state.phase==='lobby'&&!['hand','task','selection'].includes(mobilePreview);
+ const waiting=state.phase==='lobby'&&!isDesignPreview;
+ const virtual=state.config?.mode==='virtual'&&!waiting;
+ document.body.classList.toggle('is-virtual',virtual);el('mobileGame').classList.toggle('virtual-mode',virtual);el('virtualScene').hidden=!virtual;
+ if(virtual)window.VirtualTable?.render(state,playerSession?.id);
  el('mobileLobby').hidden=!waiting;el('mobileGame').hidden=waiting;document.body.classList.toggle('is-playing',!waiting);
  if(waiting){
   el('mobileLobbyIdentity').textContent=playerSession.name+' · SALA '+state.code;
@@ -68,7 +73,7 @@ function renderMobile(state){
   if(el('mobileCardDialog').open)el('mobileCardDialog').close();
  }
  renderPlayerSelection(task);
- if(!['hand','task','selection'].includes(mobilePreview)&&window.playDealAnimation?.(state,()=>{mobileDealing=false;el('mobileHand').classList.remove('dealing');renderGameActions();})){
+ if(!isDesignPreview&&window.playDealAnimation?.(state,()=>{mobileDealing=false;el('mobileHand').classList.remove('dealing');renderGameActions();})){
   mobileDealing=true;el('mobileHand').classList.add('dealing');renderGameActions();
  }
 }
@@ -100,6 +105,8 @@ function renderGameActions(){
  el('mobileDraw').title='Coger una carta de la baraja';
  el('completeShots').hidden=state.penalty?.type!=='shots'||state.penalty.playerId!==playerSession?.id;
  el('completeShots').disabled=gameActionBusy;
+ if(state.config?.mode==='virtual')el('virtualDeck').disabled=!state.canDraw||gameActionBusy||mobileDealing;
+ if(!isDesignPreview)el('mobileHand').querySelectorAll('.hand-card').forEach((card,index)=>{const playable=(state.playableCardIds||[]).includes(state.hand?.[index]?.id);card.classList.toggle('unplayable',!playable);card.disabled=!playing||!playable||gameActionBusy||mobileDealing;});
  if(!state.pending){
   const who=state.players.find(p=>p.id===state.turnPlayerId)?.name||'otro jugador';
   el('mobileTurnLabel').textContent=eliminated?'ELIMINADO':state.phase==='finished'?'PARTIDA TERMINADA':canRoll?'TE TOCA EL DADO':myTurn?'— TU TURNO —':'TURNO DE '+who.toUpperCase();
@@ -107,17 +114,19 @@ function renderGameActions(){
  }
  if(state.diceResult?.id&&state.diceResult.id!==lastDiceResultId){
   const previous=lastDiceResultId;lastDiceResultId=state.diceResult.id;
-  if(state.diceResult.playerId===playerSession?.id&&(previous!==null||gameActionBusy))showDiceResult(state.diceResult);
+  if((state.config?.mode==='virtual'||state.diceResult.playerId===playerSession?.id)&&(previous!==null||gameActionBusy))showDiceResult(state.diceResult);
  }
  if(lastDiceResultId===null&&!state.diceResult)lastDiceResultId='none';
  renderTaskApproval(state.pending);
  renderSuggestions(state.pending);
+ if(state.config?.mode==='virtual'&&state.publicAction&&!state.pending){const actor=state.players.find(p=>p.id===state.publicAction.playerId)?.name||'Jugador';el('mobileTurnLabel').textContent=actor+' · CARTA EN CURSO';el('mobileTurnHint').textContent='El siguiente turno espera la resolución';}
  if(state.config?.mode==='presencial'&&state.pending?.action==='next-dice'){
   el('mobileTaskStatus').textContent='Elijan en voz alta quién lanza el dado físico. Confirma después de la tirada.';
   el('completeTask').textContent='DADO FÍSICO LANZADO';
  }
 }
 async function sendGameAction(endpoint,data){
+ if(isDesignPreview){el('mobileStatus').textContent='Vista de diseño';return {count:1,id:'preview-die-'+Date.now(),taskId:'preview-die',playerId:'preview',mode:'virtual',value:4};}
  if(gameActionBusy||mobileDealing)return;gameActionBusy=true;renderGameActions();
  try{const result=await playerRequest(endpoint,data);renderMobile(await playerRequest('/api/state'));return result;}
  catch(error){el('mobileStatus').textContent=error.message;throw error;}
@@ -128,7 +137,7 @@ el('mobilePass').addEventListener('click',()=>sendGameAction('/api/pass',{}).cat
 el('completeShots').addEventListener('click',()=>sendGameAction('/api/penalty',{}).catch(()=>{}));
 function showDiceResult(result){
  if(result.mode==='presencial'){if(el('mobileDiceDialog').open)el('mobileDiceDialog').close();return;}
- clearTimeout(diceAnimationTimer);el('mobileDiceTitle').textContent='Tu tirada';el('mobileDiceMessage').textContent='';
+ clearTimeout(diceAnimationTimer);const roller=playerState?.players.find(p=>p.id===result.playerId)?.name||'Jugador';el('mobileDiceTitle').textContent=result.playerId===playerSession?.id?'Tu tirada':'Tirada de '+roller;el('mobileDiceMessage').textContent='';
  el('mobileDiceCube').hidden=false;el('mobileDiceCube').textContent='?';el('mobileDiceCube').classList.remove('rolling');void el('mobileDiceCube').offsetWidth;el('mobileDiceCube').classList.add('rolling');
  el('mobileDiceDone').textContent='CONTINUAR';el('mobileDiceDone').disabled=true;
  if(matchMedia('(orientation: portrait) and (max-width:700px)').matches)suspendedDiceDialog=true;else if(!el('mobileDiceDialog').open)el('mobileDiceDialog').showModal();
@@ -152,6 +161,7 @@ async function connectMobile(){
  renderMobile(state);
  mobileStream?.close();mobileStream=new EventSource('/api/events?token='+encodeURIComponent(playerSession.token));
  mobileStream.onmessage=e=>{el('mobileStatus').textContent='Conectado';el('mobileTaskStatus').textContent='';renderMobile(JSON.parse(e.data));};
+ mobileStream.addEventListener('reaction',event=>{if(playerState?.config?.mode==='virtual')window.VirtualTable?.addReaction(JSON.parse(event.data));});
  mobileStream.onerror=()=>{el('mobileStatus').textContent='Reconectando… No cierres esta pantalla.';el('mobileTaskStatus').textContent='Reconectando… La carta sigue pendiente.';el('completeTask').disabled=true;};
 }
 const invitedRoom=(new URLSearchParams(location.search).get('room')||'').trim().toUpperCase();
@@ -160,7 +170,7 @@ if(invitedRoom){el('joinMobile').querySelector('h1').textContent='ENTRAR A LA SA
 el('joinMobile').addEventListener('submit',async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{playerSession=await playerRequest('/api/join',{code:el('joinCode').value.trim().toUpperCase(),name:el('joinName').value.trim(),avatar:selectedAvatar});try{sessionStorage.setItem('todo-nada-phone',JSON.stringify(playerSession));}catch{}await connectMobile();}catch(error){el('mobileStatus').textContent=error.message;}finally{button.disabled=false;}});
 async function submitTask(fulfilled=true){
  if(submitting||!playerState?.pending)return;
- if(['task','selection'].includes(mobilePreview)){renderMobile({...playerState,pending:null});renderHand(true);el('mobileStatus').textContent='Vista de diseño · confirmación de ejemplo';return;}
+ if(isDesignPreview){renderMobile({...playerState,pending:null,publicAction:null});renderHand(true);el('mobileStatus').textContent='Vista de diseño · confirmación de ejemplo';return;}
  submitting=true;el('completeTask').disabled=true;el('rejectTask').disabled=true;
  const task=playerState.pending;
  try{await playerRequest('/api/complete',{taskId:task.id,selectedPlayerId:selectedTargetId,...(task.judgeId?{fulfilled}:{})});el('mobileStatus').textContent=fulfilled?'¡Confirmado!':'No cumplido. Corresponde lanzar el dado.';renderMobile(await playerRequest('/api/state'));}
@@ -170,6 +180,7 @@ async function submitTask(fulfilled=true){
 el('completeTask').addEventListener('click',()=>submitTask(true));
 el('rejectTask').addEventListener('click',()=>submitTask(false));
 async function requestPrompt(endpoint,kind){
+ if(isDesignPreview&&playerState?.pending){const task={...playerState.pending,choice:kind,...(endpoint==='/api/suggest'?{suggestion:{text:kind==='question'?'¿Cuál es la mentira más descarada que has dicho para conseguir una cita?':'Haz un baile de 20 segundos con la canción que el grupo elija.',completion:'Completar la consigna o la alternativa acordada.'}}:{})};renderMobile({...playerState,pending:task,publicAction:task});return;}
  if(submitting||!playerState?.pending)return;submitting=true;renderSuggestions(playerState.pending);
  try{await playerRequest(endpoint,{taskId:playerState.pending.id,kind});renderMobile(await playerRequest('/api/state'));}
  catch(error){el('mobileTaskStatus').textContent=error.message;el('mobileStatus').textContent=error.message;}
@@ -190,10 +201,10 @@ matchMedia('(orientation: portrait) and (max-width:700px)').addEventListener('ch
  if(!event.matches&&suspendedDiceDialog){suspendedDiceDialog=false;el('mobileDiceDialog').showModal();}
 });
 el('mobileCardDialog').addEventListener('cancel',e=>e.preventDefault());
-async function leaveMobileRoom(){if(!['hand','task','selection'].includes(mobilePreview)){try{await playerRequest('/api/leave',{});}catch(error){el('mobileStatus').textContent=error.message;return;}}mobileStream?.close();mobileStream=null;playerSession=null;playerState=null;try{sessionStorage.removeItem('todo-nada-phone');}catch{}el('mobileEntry').hidden=false;el('joinMobile').hidden=false;el('mobileGame').hidden=true;el('mobileLobby').hidden=true;document.body.classList.remove('is-playing');el('mobileStatus').textContent='Saliste de la sala.';}
+async function leaveMobileRoom(){if(!isDesignPreview){try{await playerRequest('/api/leave',{});}catch(error){el('mobileStatus').textContent=error.message;return;}}mobileStream?.close();mobileStream=null;playerSession=null;playerState=null;try{sessionStorage.removeItem('todo-nada-phone');}catch{}el('mobileEntry').hidden=false;el('joinMobile').hidden=false;el('mobileGame').hidden=true;el('mobileLobby').hidden=true;document.body.classList.remove('is-playing','is-virtual');el('mobileGame').classList.remove('virtual-mode');el('virtualScene').hidden=true;el('mobileStatus').textContent='Saliste de la sala.';}
 el('leaveMobile').addEventListener('click',leaveMobileRoom);
 el('leaveMobileLobby').addEventListener('click',leaveMobileRoom);
-(async()=>{if(['hand','task','selection'].includes(mobilePreview))return;try{
+(async()=>{if(isDesignPreview)return;try{
  const saved=sessionStorage.getItem('todo-nada-phone');
  if(saved){
   const previous=JSON.parse(saved),requested=new URLSearchParams(location.search).get('room')?.trim().toUpperCase();
@@ -243,12 +254,22 @@ function renderHand(preview){
   hand.append(card);
  });
 }
-if(['hand','task','selection'].includes(mobilePreview)){
+if(isDesignPreview){
  mobileStream?.close();playerSession={id:'preview',name:'Dani'};
  renderMobile({code:'DISEÑO',players:['Dani','Vale','Nico','Majo','Alex'].map((name,i)=>({id:i?'example-'+i:'preview',name,connected:true})),pending:null});
  renderHand(true);el('mobileTurnLabel').textContent='— TU TURNO —';el('mobileTurnHint').textContent='Es tu momento de decidir';el('mobileStatus').textContent='Vista de diseño. Las acciones de la partida aún no están conectadas.';
  if(mobilePreview==='task')renderMobile({...playerState,pending:{id:'preview-written-card',kind:'action',text:'Elige quién será el siguiente en lanzar el dado.'}});
  if(mobilePreview==='selection')renderMobile({...playerState,config:{mode:'virtual',expectedPlayers:5},pending:{id:'preview-selection',kind:'action',requiresSelection:true,text:'Elige quién será el siguiente en lanzar el dado'}});
+ if(mobilePreview?.startsWith('virtual')){
+  const count=Math.max(2,Math.min(100,Number(new URLSearchParams(location.search).get('players'))||4));
+  const names=['Dani','Valeria','Mateo','Sofía','Lucas','Camila','Lucía','Bruno','Diego','Emma'];
+  const files=['Lila/Lila-3.png','Coral/Coral-7.png','Amarillo/Amarillo-2.png','Turqueza/Turqesa-5.png','Lila/Reversa-lila.png','Coral/Bloqueo_5.png','Amarillo/Amarillo-9.png','Lila/Lila-9.png'];
+  const hand=files.map((file,i)=>({id:'preview-card-'+i,file:'Cartas normales/'+file,title:'Carta '+(i+1),color:'Lila'}));
+  const participants=Array.from({length:count},(_,i)=>({id:i?'example-'+i:'preview',name:names[i%names.length]+(i>=10?' '+(i+1):''),avatar:PLAYER_AVATARS[i%PLAYER_AVATARS.length].file,cardCount:i?3+i%6:8,connected:true}));
+  const task=mobilePreview==='virtual-task'?{id:'preview-task',kind:'question',playerId:'preview',judgeId:'example-1',text:'¿Qué señal de alarma has ignorado porque alguien te atraía demasiado?'}:mobilePreview==='virtual-judge'?{id:'preview-task',kind:'challenge',playerId:'example-1',judgeId:'preview',text:'El grupo elige una canción. Baila 20 segundos o cumple la alternativa que hayan acordado.'}:null;
+  const dice=mobilePreview==='virtual-dice'?{id:'preview-die',playerId:'preview',mode:'virtual'}:null;
+  renderMobile({phase:'playing',code:'HT5KL',dealId:'virtual-preview',config:{mode:'virtual',expectedPlayers:count},players:participants,hand,topCard:{file:'Cartas normales/Lila/Reversa-lila.png',title:'Reversa'},activeColor:'Lila',activeColors:['Lila'],direction:1,deckRemaining:128,turnPlayerId:'preview',canDraw:!task&&!dice,canPass:false,playableCardIds:hand.map(c=>c.id),pending:task,publicAction:task,diceTask:dice,reactions:[],serverNow:Date.now(),actionClock:{type:task?'task':dice?'dice':'turn',playerId:task?.playerId||'preview',deadline:Date.now()+(task?(task.kind==='question'?60:90):dice?15:25)*1000,expired:false}});
+ }
 }
 
 
@@ -258,7 +279,7 @@ document.querySelectorAll('[data-reaction]').forEach(button=>button.addEventList
  const buttons=document.querySelectorAll('[data-reaction]');buttons.forEach(item=>item.disabled=true);
  button.classList.add('reaction-sent');
  try{
-  if(['hand','task','selection'].includes(mobilePreview))el('mobileStatus').textContent='Vista de diseño · '+button.dataset.reaction;
+  if(isDesignPreview)el('mobileStatus').textContent='Vista de diseño · '+button.dataset.reaction;
   else{await playerRequest('/api/reaction',{emoji:button.dataset.reaction});el('mobileStatus').textContent='Reacción enviada '+button.dataset.reaction;}
  }catch(error){el('mobileStatus').textContent=error.message;}
  finally{setTimeout(()=>{reactionBusy=false;buttons.forEach(item=>item.disabled=playerState?.phase==='finished');button.classList.remove('reaction-sent');},400);}

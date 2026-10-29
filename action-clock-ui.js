@@ -1,7 +1,7 @@
 (function(){
  let state=null,serverAt=0,receivedAt=0;
  const clocks=[];
- for(const selector of ['.turn-banner','.turn-chip','#cardDialog','#mobileCardDialog','#mobileDiceDialog']){
+ for(const selector of ['.turn-banner','.turn-chip','#cardDialog','#mobileCardDialog','#mobileDiceDialog','#virtualCardDialog']){
   const parent=document.querySelector(selector);if(!parent)continue;
   const element=document.createElement('span');element.className='action-countdown';element.hidden=true;element.setAttribute('role','timer');parent.append(element);clocks.push(element);
  }
