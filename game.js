@@ -32,6 +32,7 @@ function setDice(room,playerId,source){room.diceTask={id:crypto.randomUUID(),pla
 function penaltyInfo(card){return {draw2:['cards',2],draw4:['cards',4],shots2:['shots',2],shots4:['shots',4]}[card.effectId];}
 function canPlay(room,playerId,card){
  if(room.phase!=='playing'||room.players.get(playerId)?.eliminated||room.turnPlayerId!==playerId||room.pending||room.diceTask)return false;
+ if(room.penalty?.awaitingConfirmation)return false;
  if(room.penalty){const info=penaltyInfo(card);return Boolean(info&&info[0]===room.penalty.type&&info[1]>=room.penalty.minimum);}
  const colors=cardColors(card),inPlay=activeColors(room),number=cardNumber(card),topNumber=cardNumber(room.topCard);
  const sameType=Boolean(card.effectId&&card.effectId===room.topCard?.effectId);
@@ -101,4 +102,4 @@ function rollDice(room,playerId,taskId){
  room.diceResult=result;room.diceTask=null;finishIfReady(room);return result;
 }
 function completeShots(room,playerId){requireGame(room);if(room.pending||room.diceTask||room.penalty?.type!=='shots'||room.penalty.playerId!==playerId)throw Error('No tienes una penalización de shots pendiente.');room.penalty=null;advance(room,playerId);}
-module.exports={nextPlayer,finishIfReady,enforceLimits,canPlay,canDraw,canPass,playCard,drawOne,passTurn,completeAction,rollDice,completeShots};
+module.exports={nextPlayer,finishIfReady,enforceLimits,canPlay,canDraw,canPass,playCard,drawOne,passTurn,completeAction,rollDice,completeShots,drawCards,advance};

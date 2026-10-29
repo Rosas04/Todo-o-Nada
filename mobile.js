@@ -1,5 +1,6 @@
 let playerSession=null,playerState=null,mobileStream=null,submitting=false,lastDisplayedTaskId=null,selectedTargetId=null;
 let gameActionBusy=false,lastDiceResultId=null,diceAnimationTimer=null,mobileDealing=false,reactionBusy=false;
+let lastTimeoutSeen=null;
 const mobilePreview=new URLSearchParams(location.search).get('preview');
 const el=id=>document.getElementById(id);
 let selectedAvatar=PLAYER_AVATARS[0].file;
@@ -16,16 +17,28 @@ function renderTaskApproval(task){
  el('rejectTask').hidden=!canJudge;el('rejectTask').disabled=submitting;
  if(!judged){if(task)el('mobileTaskStatus').textContent='';return;}
  el('completeTask').hidden=!canJudge;el('completeTask').disabled=submitting;
- el('completeTask').textContent='CUMPLIDO';
+ el('completeTask').textContent='CUMPLIÓ';el('rejectTask').textContent='NO CUMPLIÓ';
  const responder=playerState.players.find(p=>p.id===task.playerId)?.name||'El jugador';
  const judge=playerState.players.find(p=>p.id===task.judgeId)?.name||'Quien lanzó la carta';
  el('mobileTaskTitle').textContent=canJudge?'Evalúa el cumplimiento':'Tu pregunta o reto';
- el('mobileTaskStatus').textContent=canJudge?'¿'+responder+' cumplió? Confirma el resultado.':judge+' confirmará si se cumplió.';
+ el('mobileTaskStatus').textContent=canJudge?(task.awaitingEvaluation?'Se acabó el tiempo. Evalúa si '+responder+' cumplió.':'¿'+responder+' cumplió? Confirma el resultado.'):judge+' confirmará si se cumplió.';
  el('mobileTurnLabel').textContent=canJudge?'EVALÚA EL CUMPLIMIENTO':'RESPONDE O CUMPLE EL RETO';
  el('mobileTurnHint').textContent=canJudge?'Tú lanzaste esta carta':'Espera la confirmación de '+judge;
 }
+function renderSuggestions(task){
+ const judged=Boolean(task?.judgeId),mine=task?.judgeId===playerSession?.id,expired=Boolean(playerState?.actionClock?.expired);
+ el('suggestionTools').hidden=!judged;
+ const kind=task?.kind==='spoken'?task.choice:task?.kind;
+ for(const [id,value] of [['suggestQuestion','question'],['suggestChallenge','challenge']]){el(id).hidden=!judged||!mine||Boolean(kind&&kind!==value);el(id).disabled=submitting||expired;}
+ for(const [id,value] of [['chooseTruth','question'],['chooseDare','challenge']]){el(id).hidden=!judged||task.kind!=='spoken'||task.playerId!==playerSession?.id||Boolean(task.choice);el(id).disabled=submitting||expired;}
+ el('suggestionCriteria').hidden=!task?.suggestion;
+ el('suggestionCriteria').textContent=task?.suggestion?'Cumple si: '+task.suggestion.completion:'';
+ if(task?.suggestion)el('mobileTaskText').textContent=task.suggestion.text;
+ else if(task?.kind==='spoken'&&task.choice)el('mobileTaskText').textContent=task.choice==='question'?'Verdad':'Reto';
+}
 function renderMobile(state){
- playerState=state;el('mobileEntry').hidden=true;el('joinMobile').hidden=true;
+ playerState=state;window.updateActionClock?.(state);el('mobileEntry').hidden=true;el('joinMobile').hidden=true;
+ if(state.lastTimeout?.id!==lastTimeoutSeen){lastTimeoutSeen=state.lastTimeout?.id||null;if(state.lastTimeout?.type==='dice'&&state.lastTimeout.playerId===playerSession?.id){if(el('mobileDiceDialog').open)el('mobileDiceDialog').close();suspendedDiceDialog=false;el('mobileStatus').textContent='Se agotó el tiempo del dado: recibiste una carta. No se hizo ninguna tirada.';}}
  const waiting=state.phase==='lobby'&&!['hand','task','selection'].includes(mobilePreview);
  el('mobileLobby').hidden=!waiting;el('mobileGame').hidden=waiting;document.body.classList.toggle('is-playing',!waiting);
  if(waiting){
@@ -98,6 +111,7 @@ function renderGameActions(){
  }
  if(lastDiceResultId===null&&!state.diceResult)lastDiceResultId='none';
  renderTaskApproval(state.pending);
+ renderSuggestions(state.pending);
  if(state.config?.mode==='presencial'&&state.pending?.action==='next-dice'){
   el('mobileTaskStatus').textContent='Elijan en voz alta quién lanza el dado físico. Confirma después de la tirada.';
   el('completeTask').textContent='DADO FÍSICO LANZADO';
@@ -155,6 +169,16 @@ async function submitTask(fulfilled=true){
 }
 el('completeTask').addEventListener('click',()=>submitTask(true));
 el('rejectTask').addEventListener('click',()=>submitTask(false));
+async function requestPrompt(endpoint,kind){
+ if(submitting||!playerState?.pending)return;submitting=true;renderSuggestions(playerState.pending);
+ try{await playerRequest(endpoint,{taskId:playerState.pending.id,kind});renderMobile(await playerRequest('/api/state'));}
+ catch(error){el('mobileTaskStatus').textContent=error.message;el('mobileStatus').textContent=error.message;}
+ finally{submitting=false;renderPlayerSelection(playerState?.pending);}
+}
+el('suggestQuestion').addEventListener('click',()=>requestPrompt('/api/suggest','question'));
+el('suggestChallenge').addEventListener('click',()=>requestPrompt('/api/suggest','challenge'));
+el('chooseTruth').addEventListener('click',()=>requestPrompt('/api/choice','question'));
+el('chooseDare').addEventListener('click',()=>requestPrompt('/api/choice','challenge'));
 el('landscapeMode').addEventListener('click',async()=>{
  try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen?.();}catch{}
  try{await screen.orientation?.lock?.('landscape');}catch{}

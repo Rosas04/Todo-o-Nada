@@ -72,7 +72,7 @@ node --check deal-animation.js
 node --test tests/confirmations.test.js tests/game.test.js tests/reactions.test.js tests/invitations.test.js tests/avatars.test.js
 ```
 
-35 pruebas: privacidad y persistencia, ocho cartas, permisos de turno/propiedad/color/tipo, doble robo simultáneo, una carta por turno, pasar después de robar, umbral 25/26, eliminación por acumulación, suma de penalizaciones y reinicio de la cuenta al cumplirlas, turnos que saltan eliminados, dado virtual/físico, selecciones, victoria, historial de varias reacciones y limpieza al iniciar/terminar. En navegador se verificaron la animación inicial, robo con Pasar turno y dos reacciones del mismo jugador conservadas al recargar.
+50 pruebas: privacidad y persistencia, ocho cartas, permisos de turno/propiedad/color/tipo, doble robo simultáneo, una carta por turno, pasar después de robar, umbral 25/26, eliminación por acumulación, suma de penalizaciones y reinicio de la cuenta al cumplirlas, turnos que saltan eliminados, dado virtual/físico, selecciones, victoria, historial de varias reacciones y limpieza al iniciar/terminar. En navegador se verificaron la animación inicial, robo con Pasar turno y dos reacciones del mismo jugador conservadas al recargar.
 
 Vistas visuales sin conexión: /play?preview=hand, /play?preview=task y /play?preview=selection.
 
@@ -91,3 +91,11 @@ Al unirse, cada jugador elige uno de los seis avatares transparentes de Resource
 Las preguntas, los retos y Verdad o reto guardan al emisor como evaluador. Solo su sesión puede marcar Cumplido o No cumplido. El receptor ve la carta y espera; terceros no reciben esa carta privada. No cumplido activa el dado para el receptor y respeta la modalidad virtual/presencial. Las evaluaciones repetidas no cambian el resultado ya registrado.
 
 El teléfono se usa en horizontal. En vertical aparece una guía para girarlo, también al ingresar. El botón de pantalla completa intenta fijar orientación horizontal si el navegador lo permite; en los demás casos se gira el dispositivo manualmente.
+
+## Contador único y sugerencias
+
+Tiempos totales: turno normal 25 s, acumulación 20 s, pregunta escrita 60 s, reto escrito 90 s, elección de jugador 30 s, Verdad o reto 150 s, dado virtual 15 s y físico 30 s. Los retos sugeridos de llamadas o respuesta externa disponen de 120 s desde el inicio original. Verdad o reto mantiene 150 s aunque cambie la consigna. Elegir o sugerir no reinicia el contador.
+
+Al vencer una pregunta o reto, se espera la evaluación final del emisor; no se aplica castigo automáticamente. En turno normal se coge una carta y se pasa (si ya se cogió, no se cobra otra). Las acumulaciones de cartas se reciben completas y se pasa. En shots se espera confirmación. El dado vencido añade una carta y cierra la acción sin sortear un número. Las elecciones vencidas quedan pendientes de completarse, sin elegir por el jugador.
+
+Sugerir pregunta o reto utiliza un catálogo de 40 consignas de fiesta para adultos, con criterios explícitos y sin repetir durante la partida. Una nueva ronda restablece el catálogo. No responder una llamada o no prestar algo no equivale a negativa: las consignas indican el intento o una alternativa que cuenta como cumplimiento. El emisor marca Cumplió cuando se cumple la alternativa acordada; no se añade un segundo castigo.

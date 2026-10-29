@@ -231,7 +231,7 @@ async function roomRequest(endpoint,data){
  const result=await response.json();if(!response.ok)throw Error(result.error||'No se pudo conectar.');return result;
 }
 function applyRoomState(state){
- roomState=state;
+ roomState=state;window.updateActionClock?.(state);
  syncReactionHistory(state);
  window.playDealAnimation?.(state);
  const avatarNames=['pato-sinfondo.png','fantasmacute-sinfondo.png','calavera-sinfondo.png','caraderretida-sinfondo.png'];
@@ -276,8 +276,13 @@ function applyRoomState(state){
  }
  const target=state.players.find(p=>p.id===(state.pending?.judgeId||state.pending?.playerId));
  if(state.pending){
+  if(state.pending.suggestion&&location.hash==='#table'){
+   $('cardDialog').classList.add('text-only','has-suggestion');$('cardDialog').setAttribute('aria-labelledby','cardModalText');
+   $('cardModalText').textContent=state.pending.suggestion.text;
+   if(!$('cardDialog').open&&!$('rulesDialog').open){remoteTaskId=state.pending.id;effectBusy=true;$('cardDialog').showModal();}
+  }else $('cardDialog').classList.remove('has-suggestion');
   if(!remoteTaskId&&$('cardDialog').open&&$('cardDialog').classList.contains('text-only'))remoteTaskId=state.pending.id;
-  mobileStatus.textContent=target?(target.connected?(state.pending?.judgeId?'Esperando evaluación de ':'Esperando confirmación de ')+target.name:'Esperando a que '+target.name+' vuelva a conectarse'):'Esperando al jugador que responderá';
+  mobileStatus.textContent=target?(target.connected?(state.pending?.awaitingEvaluation?'Tiempo terminado. Evaluación final de ':state.pending?.judgeId?'Esperando evaluación de ':'Esperando confirmación de ')+target.name:'Esperando a que '+target.name+' vuelva a conectarse'):'Esperando al jugador que responderá';
   maybeAssignPlayer();
  }else if(remoteTaskId){
   remoteTaskId=null;

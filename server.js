@@ -8,6 +8,8 @@ const {dealRoom,activeColors}=require('./deck');
 const disk=require('node:fs');
 const game=require('./game');
 const avatars=require('./avatars');
+const actionClock=require('./action-clock');
+const suggestions=require('./suggestions');
 const root=__dirname;
 const types={'.html':'text/html; charset=utf-8','.css':'text/css','.js':'text/javascript','.png':'image/png','.jpg':'image/jpeg','.md':'text/plain; charset=utf-8'};
 function createServer({statePath=null,publicUrl=process.env.PUBLIC_URL||process.env.RENDER_EXTERNAL_URL||null,trustProxy=false}={}){
@@ -26,9 +28,10 @@ function createServer({statePath=null,publicUrl=process.env.PUBLIC_URL||process.
   disk.mkdirSync(path.dirname(statePath),{recursive:true});disk.writeFileSync(statePath+'.tmp',JSON.stringify(saved));disk.renameSync(statePath+'.tmp',statePath);
  }
  function json(res,status,data){res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));}
- function snapshot(room,identity){return {code:room.code,phase:room.phase,config:{mode:room.config.mode,expectedPlayers:room.config.expectedPlayers},dealId:room.dealId||null,dealtAt:room.dealtAt||null,...(identity.role==='host'?{reactions:room.phase==='finished'?[]:room.reactions||[]}:{}),topCard:room.topCard||null,activeColors:activeColors(room),activeColor:room.activeColor||room.topCard?.color||null,direction:room.direction||1,lastPlay:room.lastPlay||null,diceTask:room.diceTask||null,diceResult:room.diceResult||null,penalty:room.penalty||null,winnerId:room.winnerId||null,deckRemaining:room.deck?.length??null,turnPlayerId:room.turnPlayerId||null,...(identity.role==='player'?{hand:room.players.get(identity.id)?.eliminated?[]:room.players.get(identity.id)?.hand||[],canDraw:game.canDraw(room,identity.id),canPass:game.canPass(room,identity.id),playableCardIds:(room.players.get(identity.id)?.hand||[]).filter(card=>game.canPlay(room,identity.id,card)).map(card=>card.id)}:{}),resolution:room.resolution||null,players:[...room.players.values()].map(p=>({id:p.id,name:p.name,avatar:p.avatar||avatars[0].file,connected:p.streams.size>0,cardCount:p.hand?.length??null,eliminated:Boolean(p.eliminated),eliminationReason:p.eliminationReason||null})),pending:identity.role==='host'||room.pending?.playerId===identity.id||room.pending?.judgeId===identity.id?room.pending:null};}
- function broadcast(room){persist();for(const client of room.clients){if(client.res.destroyed||client.res.writableEnded)continue;client.res.write('data: '+JSON.stringify(snapshot(room,client.identity))+'\n\n');}}
- async function body(req){let bytes=0,parts=[];for await(const chunk of req){bytes+=chunk.length;if(bytes>12000)throw Error('Solicitud demasiado grande');parts.push(chunk);}return JSON.parse(Buffer.concat(parts).toString()||'{}');}
+ function snapshot(room,identity){return {code:room.code,phase:room.phase,serverNow:Date.now(),actionClock:room.actionClock||null,lastTimeout:room.lastTimeout||null,config:{mode:room.config.mode,expectedPlayers:room.config.expectedPlayers},dealId:room.dealId||null,dealtAt:room.dealtAt||null,...(identity.role==='host'?{reactions:room.phase==='finished'?[]:room.reactions||[]}:{}),topCard:room.topCard||null,activeColors:activeColors(room),activeColor:room.activeColor||room.topCard?.color||null,direction:room.direction||1,lastPlay:room.lastPlay||null,diceTask:room.diceTask||null,diceResult:room.diceResult||null,penalty:room.penalty||null,winnerId:room.winnerId||null,deckRemaining:room.deck?.length??null,turnPlayerId:room.turnPlayerId||null,...(identity.role==='player'?{hand:room.players.get(identity.id)?.eliminated?[]:room.players.get(identity.id)?.hand||[],canDraw:game.canDraw(room,identity.id),canPass:game.canPass(room,identity.id),playableCardIds:(room.players.get(identity.id)?.hand||[]).filter(card=>game.canPlay(room,identity.id,card)).map(card=>card.id)}:{}),resolution:room.resolution||null,players:[...room.players.values()].map(p=>({id:p.id,name:p.name,avatar:p.avatar||avatars[0].file,connected:p.streams.size>0,cardCount:p.hand?.length??null,eliminated:Boolean(p.eliminated),eliminationReason:p.eliminationReason||null})),pending:identity.role==='host'||room.pending?.playerId===identity.id||room.pending?.judgeId===identity.id?room.pending:null};}
+ function broadcast(room){actionClock.sync(room);persist();for(const client of room.clients){if(client.res.destroyed||client.res.writableEnded)continue;client.res.write('data: '+JSON.stringify(snapshot(room,client.identity))+'\n\n');}}
+ async function body(req){let bytes=0,parts=[];for await(const chunk of req){bytes+=chunk.length;if(bytes>12000)throw Error('Solicitud demasiado grande');parts.push(chunk);}const auth=authenticate(req,new URL(req.url,'http://localhost'));if(auth&&actionClock.expire(auth.room))broadcast(auth.room);
+ return JSON.parse(Buffer.concat(parts).toString()||'{}');}
  function authenticate(req,url){const token=req.headers.authorization?.replace(/^Bearer /,'')||url.searchParams.get('token');for(const room of rooms.values()){if(token===room.hostToken)return {room,identity:{role:'host'}};for(const player of room.players.values())if(token===player.token)return {room,identity:{role:'player',id:player.id}};}return null;}
  const server=http.createServer(async(req,res)=>{try{
   res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');
@@ -58,6 +61,26 @@ function createServer({statePath=null,publicUrl=process.env.PUBLIC_URL||process.
    }
    const auth=authenticate(req,url);if(!auth)return json(res,401,{error:'Vuelve a conectar con la sala.'});
    const {room,identity}=auth;
+   if(actionClock.expire(room))broadcast(room);
+   if(['/api/choice','/api/suggest'].includes(pathname)&&req.method==='POST'){
+    if(identity.role!=='player')return json(res,403,{error:'Esta acción corresponde al jugador.'});
+    const data=await body(req),task=room.pending;
+    if(!task||task.id!==data.taskId||!task.judgeId)return json(res,409,{error:'La pregunta o el reto ya no está pendiente.'});
+    if(room.actionClock?.expired)return json(res,409,{error:'El tiempo terminó. Quien lanzó la carta debe evaluar el cumplimiento.'});
+    if(pathname==='/api/choice'){
+     if(task.kind!=='spoken'||![task.playerId,task.judgeId].includes(identity.id))return json(res,403,{error:'La elección corresponde a quienes participan en esta carta.'});
+     if(!['question','challenge'].includes(data.kind))return json(res,400,{error:'Elige Verdad o Reto.'});
+     if(task.choice&&task.choice!==data.kind)return json(res,409,{error:'La elección ya está hecha.'});
+     task.choice=data.kind;
+    }else{
+     if(identity.id!==task.judgeId)return json(res,403,{error:'Solo quien lanzó la carta puede pedir una sugerencia.'});
+     const kind=task.kind==='spoken'?(task.choice||data.kind):task.kind;
+     if(!['question','challenge'].includes(kind)||data.kind&&kind!==data.kind)return json(res,400,{error:'La sugerencia debe coincidir con la pregunta o el reto elegido.'});
+     try{task.suggestion=suggestions.suggest(room,kind);}catch(error){return json(res,409,{error:error.message});}
+     if(task.kind==='spoken')task.choice=kind;
+    }
+    broadcast(room);return json(res,200,{ok:true});
+   }
    if(pathname==='/api/reaction'&&req.method==='POST'){
     if(identity.role!=='player')return json(res,403,{error:'Las reacciones se envían desde el jugador.'});
     const data=await body(req),allowed=['😂','🔥','😎','💜','👍','😮','👏','🎉'];
@@ -145,12 +168,14 @@ function createServer({statePath=null,publicUrl=process.env.PUBLIC_URL||process.
   }
   const file=path.resolve(root,'.'+(pathname==='/play'?'/mobile.html':['/','/host'].includes(pathname)?'/index.html':pathname));
   const relative=path.relative(root,file);
-  if(!file.startsWith(root+path.sep)||(!['index.html','avatars.js','app.js','deal-animation.js','cards.js','styles.css','screen.css','mobile-screen.css','mobile.html','mobile.js','mobile.css'].includes(relative)&&file!==path.join(root,'vendor','qrcode.js')&&!file.startsWith(path.join(root,'Resource')+path.sep)&&file!==path.join(root,'Rules','Reglas_Todo_o_Nada.md')&&file!==path.join(root,'Rules','Rules.png')))return json(res,403,{error:'Acceso no permitido'});
+  if(!file.startsWith(root+path.sep)||(!['index.html','avatars.js','app.js','deal-animation.js','cards.js','styles.css','action-clock-ui.js','action-clock-ui.css','screen.css','mobile-screen.css','mobile.html','mobile.js','mobile.css'].includes(relative)&&file!==path.join(root,'vendor','qrcode.js')&&!file.startsWith(path.join(root,'Resource')+path.sep)&&file!==path.join(root,'Rules','Reglas_Todo_o_Nada.md')&&file!==path.join(root,'Rules','Rules.png')))return json(res,403,{error:'Acceso no permitido'});
   const content=await fs.readFile(file);res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'});res.end(content);
  }catch(error){if(!res.headersSent)json(res,error.code==='ENOENT'?404:400,{error:error.code==='ENOENT'?'No encontrado':'Solicitud no válida'});else res.end();}});
- server.on('close',()=>{for(const room of rooms.values()){const clients=[...room.clients];room.clients.clear();for(const client of clients)client.res.end();}});
+ let clockTicker;
+ server.on('listening',()=>{for(const room of rooms.values()){actionClock.expire(room);actionClock.sync(room);}clockTicker=setInterval(()=>{if(!shuttingDown)for(const room of rooms.values())if(actionClock.expire(room))broadcast(room);},100);clockTicker.unref();});
+ server.on('close',()=>{clearInterval(clockTicker);for(const room of rooms.values()){const clients=[...room.clients];room.clients.clear();for(const client of clients)client.res.end();}});
  server.shutdown=()=>{
-  if(shuttingDown)return;shuttingDown=true;persist();
+  if(shuttingDown)return;shuttingDown=true;clearInterval(clockTicker);persist();
   for(const room of rooms.values())for(const client of [...room.clients])client.res.end();
   server.close();
   const deadline=setTimeout(()=>server.closeAllConnections(),5000);deadline.unref();

@@ -39,6 +39,7 @@ function makeDeck(){
 function dealRoom(room){
  for(const field of ['pending','diceTask','penalty','finisherId','winnerId','lastPlay','diceResult','sharedChallenge','resolution','lastCompleted','drawState'])room[field]=null;
  room.reactions=[];room.turnSerial=1;room.dealtAt=Date.now();
+ room.actionClock=null;room.lastTimeout=null;room.usedSuggestions=[];
  const deck=[],count=8,participants=[...room.players.values()];
  const base=makeDeck(),packs=Math.ceil((participants.length*count+1)/base.length);
  for(let pack=0;pack<packs;pack++)deck.push(...base.map(card=>({...card,id:card.id+'-pack-'+pack})));
