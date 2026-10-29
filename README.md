@@ -82,7 +82,7 @@ La modalidad configurada en la sala decide la vista automáticamente. En virtual
 
 Las cartas se juegan directamente desde la mano y el mazo central permite coger respetando las mismas reglas del servidor. Preguntas, retos, elecciones, sugerencias y evaluación de Cumplió/No cumplió conservan sus permisos y tiempos. El resto puede consultar la consigna pública, sin recibir controles de evaluación ni manos ajenas. Los resultados del dado virtual se muestran animados a todos. Las reacciones se conservan junto a los avatares y en el historial de la mesa.
 
-El modo presencial mantiene la pantalla principal y el teléfono como control privado. El fondo virtual está incluido en Resource/Backgrounds/virtual-room.png; no requiere servicios externos.
+El modo presencial mantiene la pantalla principal y el teléfono como control privado. La mesa virtual usa Resource/Interfaces/mod-virtual-fondo.png, que ya incluye la mesa. Inicio y lobby usan los recursos de Resource/UI/ModoVirtual con controles reales, QR y participantes sincronizados; no requieren servicios externos.
 
 ## Invitaciones por enlace y QR
 

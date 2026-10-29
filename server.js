@@ -168,7 +168,7 @@ function createServer({statePath=null,publicUrl=process.env.PUBLIC_URL||process.
   }
   const file=path.resolve(root,'.'+(pathname==='/play'?'/mobile.html':['/','/host'].includes(pathname)?'/index.html':pathname));
   const relative=path.relative(root,file);
-  if(!file.startsWith(root+path.sep)||(!['index.html','avatars.js','app.js','deal-animation.js','cards.js','styles.css','virtual-table.js','virtual-table.css','action-clock-ui.js','action-clock-ui.css','screen.css','mobile-screen.css','mobile.html','mobile.js','mobile.css'].includes(relative)&&file!==path.join(root,'vendor','qrcode.js')&&!file.startsWith(path.join(root,'Resource')+path.sep)&&file!==path.join(root,'Rules','Reglas_Todo_o_Nada.md')&&file!==path.join(root,'Rules','Rules.png')))return json(res,403,{error:'Acceso no permitido'});
+  if(!file.startsWith(root+path.sep)||(!['index.html','avatars.js','app.js','deal-animation.js','cards.js','styles.css','welcome-ui.css','virtual-table.js','virtual-table.css','action-clock-ui.js','action-clock-ui.css','screen.css','mobile-screen.css','mobile.html','mobile.js','mobile.css'].includes(relative)&&file!==path.join(root,'vendor','qrcode.js')&&!file.startsWith(path.join(root,'Resource')+path.sep)&&file!==path.join(root,'Rules','Reglas_Todo_o_Nada.md')&&file!==path.join(root,'Rules','Rules.png')))return json(res,403,{error:'Acceso no permitido'});
   const content=await fs.readFile(file);res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'});res.end(content);
  }catch(error){if(!res.headersSent)json(res,error.code==='ENOENT'?404:400,{error:error.code==='ENOENT'?'No encontrado':'Solicitud no válida'});else res.end();}});
  let clockTicker;

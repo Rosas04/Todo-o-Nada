@@ -50,25 +50,32 @@ render();
 /* Entry and waiting-room screens share the original lavender relief style. */
 const shell=document.createElement('div');
 shell.id='welcome';
-shell.innerHTML=`<div class="welcome-frame"><div class="welcome-top"><a href="#home" class="welcome-title" aria-label="Todo o Nada, inicio"><img src="${asset('Logo/logo-vertical.png')}" alt="Todo o Nada"></a><button class="host-profile" data-account aria-label="Editar perfil del árbitro"><div><small>ÁRBITRO</small><b data-profile-name>Tu nombre</b></div><img src="${asset('Users/Sin Fondo/fantasma-sinfondo.png')}" alt=""></button></div>
-<section id="homeScreen" class="welcome-content"><h1>El juego de decisiones extremas</h1><div class="entry-panels">
-<section class="entry-panel create-panel"><h2>CREAR SALA</h2><p>Crea tu propia sala y juega<br>con tus amigos</p><button class="relief-button" id="createRoom">CREAR SALA <span>＋</span></button></section></div>
-<div class="welcome-features"><div><span>♧</span><p>Desde 2 jugadores<small>La diversión se comparte</small></p></div><div><span>▱</span><p>Cartas extremas<small>Ríe, decide y arriesga</small></p></div><div><span>ϟ</span><p>Una sola mesa<small>Cada mano en su celular</small></p></div></div></section>
-<section id="lobbyScreen" class="lobby-content" hidden><div class="lobby-intro"><span class="eyebrow">QUE SE REÚNA LA MESA</span><h1>Sala de espera</h1><p>Este es el lugar de espera antes de repartir las cartas.</p></div><div class="lobby-grid"><section class="invite-panel"><div class="invite-code"><small>CÓDIGO DE SALA</small><button id="lobbyCopy" aria-label="Copiar código de sala HT5KL">HT5KL <span>▣</span></button><p>Juega en persona o a distancia.<br>Tu mano está en tu celular.</p></div></section><section class="waiting-panel"><div class="waiting-heading"><h2>En la sala</h2><span id="lobbyCount" role="status">0 jugadores</span></div><div id="waitingPlayers" class="waiting-players" aria-live="polite"></div><div class="waiting-status"><i></i><span id="waitingStatus">Esperando a los jugadores…</span></div><button id="startDemo" class="relief-button" disabled>INICIAR PARTIDA <span>→</span></button><p class="start-note">Todos los jugadores deben estar conectados.</p></section></div><a class="back-home" href="#home">← Volver al inicio</a></section></div>`;
+shell.innerHTML=`<div class="welcome-frame"><div class="welcome-top"><a href="#home" class="welcome-title" aria-label="Todo o Nada, inicio"><img src="${asset('Logo/logo-vertical.png')}" alt="Todo o Nada"></a><span id="lobbyModeBadge" class="lobby-mode-badge" hidden></span><button class="host-profile" data-account aria-label="Editar perfil del árbitro"><img src="${asset('Users/Sin Fondo/fantasma-sinfondo.png')}" alt=""><div><small>TU PERFIL</small><b data-profile-name>Tu nombre</b></div><span aria-hidden="true">⚙</span></button></div>
+<section id="homeScreen" class="welcome-content"><div class="home-copy"><span class="home-kicker">✦ &nbsp; EL JUEGO EMPIEZA CONTIGO</span><h1>Todo puede cambiar<br>en una carta.</h1><p>Reúne a tus amigos. Ríe, decide y arriesga.</p></div><div class="home-table-art" aria-hidden="true"><img class="home-table" src="${asset('UI/ModoVirtual/mesa-transparente.png')}" alt=""><div class="home-card-fan">${['Lila/Lila-3.png','Coral/Coral-7.png','Turqueza/Turqesa-5.png','Amarillo/Amarillo-2.png'].map((file,i)=>`<img style="--i:${i}" src="${asset('Cartas normales/'+file)}" alt="">`).join('')}</div><span class="home-die">⚄</span></div><div class="entry-panels">
+<section class="entry-panel create-panel"><div class="entry-heading"><span class="entry-icon" aria-hidden="true">♧</span><div><h2>CREAR SALA</h2><p>Elige el modo e invita<br>a tus amigos.</p></div></div><button class="relief-button" id="createRoom">CREAR SALA <span>＋</span></button></section><form id="homeJoin" class="entry-panel join-panel"><div class="entry-heading"><span class="entry-icon" aria-hidden="true">↗</span><div><h2>UNIRME A UNA SALA</h2><p>¿Ya tienes una invitación?</p></div></div><input id="homeJoinCode" aria-label="Código de sala" placeholder="Código de sala" maxlength="5" minlength="5" required autocomplete="off" autocapitalize="characters" pattern="[A-Za-z0-9]{5}"><button class="relief-button" type="submit">ENTRAR <span>→</span></button></form></div>
+<div class="welcome-features"><div><span>♧</span><p>Desde 2 jugadores</p></div><div><span>▯♙</span><p>Virtual o presencial</p></div><div><span>♧</span><p>Tu mano, siempre privada</p></div></div><button id="homeRules" class="home-rules" type="button">ⓘ &nbsp; Cómo se juega</button></section>
+<section id="lobbyScreen" class="lobby-content" hidden><a class="back-home" href="#home">← &nbsp; Volver</a><div class="lobby-intro"><h1>La mesa casi está lista</h1><p>Invita a tus amigos y prepárense para jugar.</p></div><div class="lobby-grid"><section class="invite-panel"><h2><span aria-hidden="true">♧</span> INVITA A TUS AMIGOS</h2><div class="invite-code"><small>CÓDIGO DE SALA</small><button id="lobbyCopy" aria-label="Copiar código de sala HT5KL">HT5KL</button></div></section><section class="waiting-panel"><div class="waiting-heading"><h2><span aria-hidden="true">♧</span> Jugadores</h2><span id="lobbyCount" role="status">0 jugadores</span></div><div id="waitingPlayers" class="waiting-players" aria-live="polite"></div><div class="lobby-start"><div class="waiting-status"><i></i><span id="waitingStatus">Esperando a los jugadores…</span></div><div><button id="startDemo" class="relief-button" disabled><span>▶</span> INICIAR PARTIDA</button><p class="start-note">Las cartas se reparten al empezar.</p></div></div></section></div><div class="lobby-features"><span id="lobbyModeText">Modo presencial</span><span>▱ &nbsp; 8 cartas por jugador</span><span>♧ &nbsp; Manos privadas</span><button id="changeRoomConfig" type="button">⚙ &nbsp; Cambiar configuración</button></div></section></div>`;
 document.body.prepend(shell);
+const lobbyIcons={people:'<circle cx="12" cy="7" r="3"/><path d="M6 21v-3a6 6 0 0 1 12 0v3M3 21v-2a5 5 0 0 1 2-4M21 21v-2a5 5 0 0 0-2-4M4 5a3 3 0 0 0 0 6M20 5a3 3 0 0 1 0 6"/>',shield:'<path d="m12 2 8 4v6c0 5-8 10-8 10S4 17 4 12V6l8-4Z"/><path d="m8 12 3 3 5-6"/>',devices:'<rect x="2" y="3" width="14" height="11" rx="1"/><path d="M5 18h8M9 14v4"/><rect x="17" y="10" width="5" height="11" rx="1"/>',link:'<path d="m10 14 4-4M8 16l-1 1a4 4 0 0 1-6-6l5-5a4 4 0 0 1 6 0M16 8l1-1a4 4 0 0 1 6 6l-5 5a4 4 0 0 1-6 0"/>'};
+function lobbyIcon(name){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+lobbyIcons[name]+'</svg>';}
+document.querySelector('.create-panel .entry-icon').innerHTML=lobbyIcon('people');document.querySelector('#homeJoin .entry-icon').innerHTML=lobbyIcon('link');
+document.querySelectorAll('.welcome-features>div>span').forEach((span,i)=>span.innerHTML=lobbyIcon(['people','devices','shield'][i]));
+document.querySelectorAll('.invite-panel>h2>span,.waiting-heading h2>span').forEach(span=>span.innerHTML=lobbyIcon('people'));
 function renderLobby(){
  const roster=roomState?.players||[],online=roster.filter(p=>p.connected),expected=roomState?.config?.expectedPlayers||0;
- $('lobbyCount').textContent=online.length+' / '+(expected||'—')+' jugadores';
+ $('lobbyCount').textContent=online.length+' / '+(expected||'—');
+ const mode=roomState?.config?.mode==='virtual'?'Virtual':'Presencial';$('lobbyModeBadge').textContent=(mode==='Virtual'?'▱':'♧')+' MODO '+mode.toUpperCase();$('lobbyModeText').textContent=(mode==='Virtual'?'▱':'♧')+' Modo '+mode.toLowerCase();
  $('waitingPlayers').replaceChildren();
- if(!roster.length)$('waitingPlayers').innerHTML='<div class="waiting-empty"><span>♧</span><h3>Aquí comienza el grupo</h3><p>Esperando a que los jugadores se unan.</p></div>';
- roster.forEach((p,i)=>{const item=document.createElement('div');item.className='waiting-player';const image=document.createElement('img');image.src=asset('Users/Sin Fondo/'+(p.avatar||PLAYER_AVATARS[i%PLAYER_AVATARS.length].file));image.alt='';const name=document.createElement('strong');name.textContent=p.name;const status=document.createElement('span');status.textContent=p.connected?'Conectado':'Sin conexión';item.append(image,name,status);$('waitingPlayers').append(item);});
+ roster.forEach((p,i)=>{const item=document.createElement('div');item.className='waiting-player'+(p.connected?' online':' offline');const image=document.createElement('img');image.src=asset('Users/Sin Fondo/'+(p.avatar||PLAYER_AVATARS[i%PLAYER_AVATARS.length].file));image.alt='';const name=document.createElement('strong');name.textContent=p.name;const status=document.createElement('span');status.textContent=p.connected?'Conectado':'Sin conexión';item.append(image,name,status);$('waitingPlayers').append(item);});
+ for(let i=roster.length;i<Math.min(expected||4,10);i++){const slot=document.createElement('div');slot.className='waiting-slot';slot.innerHTML='<span aria-hidden="true">＋</span><small>Esperando</small>';$('waitingPlayers').append(slot);}
  $('startDemo').disabled=!expected||online.length<expected;
- $('waitingStatus').textContent=expected&&online.length>=expected?'La sala está lista.':'Esperando a los jugadores…';
+ $('waitingStatus').textContent=expected&&online.length>=expected?'Todos conectados. Puedes iniciar la partida.':'Esperando a los jugadores…';
 }
 function route(){
  const view=location.hash==='#table'?'table':location.hash==='#lobby'?'lobby':'home';
  shell.hidden=view==='table';document.querySelector('.app').hidden=view!=='table';
  $('homeScreen').hidden=view!=='home';$('lobbyScreen').hidden=view!=='lobby';
+ $('lobbyModeBadge').hidden=view!=='lobby';
  document.body.classList.toggle('welcome-mode',view!=='table');
  document.body.classList.toggle('lobby-mode',view==='lobby');
  document.body.dataset.screen=view;
@@ -77,6 +84,9 @@ function route(){
  window.scrollTo(0,0);
 }
 $('createRoom').addEventListener('click',()=>configDialog.showModal());
+$('homeJoin').addEventListener('submit',event=>{event.preventDefault();const code=$('homeJoinCode').value.trim().toUpperCase();if(/^[A-Z0-9]{5}$/.test(code))location.href='/play?room='+encodeURIComponent(code);});
+$('homeRules').addEventListener('click',()=>$('rulesButton').click());
+$('changeRoomConfig').addEventListener('click',()=>{$('expectedPlayers').value=roomState?.config?.expectedPlayers||4;configDialog.querySelector('[value="'+(roomState?.config?.mode||'presencial')+'"]').checked=true;configDialog.querySelector('.config-network-note').textContent='Al confirmar se creará una nueva sala con otro código. Comparte la nueva invitación con tus amigos.';configDialog.showModal();});
 $('startDemo').addEventListener('click',async()=>{if($('startDemo').disabled)return;$('startDemo').disabled=true;try{await roomRequest('/api/start',{});location.hash='table';}catch(error){toast(error.message);renderLobby();}});
 $('lobbyCopy').addEventListener('click',async()=>{try{await ensurePhoneRoom();await navigator.clipboard.writeText(currentRoomCode());toast('Código de sala copiado.');}catch{toast('No se pudo copiar el código.');}});
 window.addEventListener('hashchange',route);route();
@@ -205,7 +215,7 @@ window.addEventListener('hashchange',()=>{if(location.hash!=='#table'){clearTime
 // Basic phone-to-table confirmation; gameplay and private hands remain separate.
 let roomConnection=null,roomStream=null,bridgePromise=null,remoteTaskId=null,assigning=false,creatingTask=false,lastResolutionId=null,lastSeenPlayId=null,lastSeenDiceId=null;
 const phonePanel=document.createElement('div');phonePanel.className='lobby-phone-link';
-phonePanel.innerHTML='<div class="join-method"><span class="join-method-label">ESCANEA Y ENTRA A ESTA SALA</span><a id="phoneQrLink" class="room-qr" target="_blank" rel="noopener" aria-label="Abrir la sala en el celular"></a><small>Solo escribe tu nombre para entrar.</small></div><div class="join-method manual-join"><span class="join-method-label">O ABRE EL ENLACE E INGRESA EL CÓDIGO</span><a id="phoneJoinLink" target="_blank" rel="noopener"></a></div><button id="copyInvitation" type="button" class="copy-invitation">Copiar invitación ↗</button><p id="phoneStatus" role="status">Conectando con la sala…</p>';
+phonePanel.innerHTML='<div class="join-method"><a id="phoneQrLink" class="room-qr" target="_blank" rel="noopener" aria-label="Abrir la sala en el celular"></a><span class="join-method-label">Escanea<br>para unirte</span></div><button id="copyInvitation" type="button" class="copy-invitation">↗ &nbsp; COPIAR ENLACE</button><button id="copyLobbyCode" type="button" class="copy-invitation">▣ &nbsp; COPIAR CÓDIGO</button><div class="join-method manual-join"><a id="phoneJoinLink" target="_blank" rel="noopener"></a></div><small class="invite-note">ⓘ &nbsp; Cada jugador entra desde su dispositivo.</small><p id="phoneStatus" role="status">Conectando con la sala…</p>';
 document.querySelector('.invite-panel').append(phonePanel);
 let invitationUrl=null,invitationQrUrl=null;
 function renderRoomInvitation(state){
@@ -224,6 +234,7 @@ $('copyInvitation').addEventListener('click',async()=>{
  try{if(!invitationUrl)await ensurePhoneRoom();await navigator.clipboard.writeText('¡Juguemos TODO O NADA!\nSala: '+currentRoomCode()+'\n'+invitationUrl);toast('Invitación copiada.');}
  catch{toast('No se pudo copiar. Abre el QR para copiar el enlace de la sala.');}
 });
+$('copyLobbyCode').addEventListener('click',()=>$('lobbyCopy').click());
 const mobileStatus=document.createElement('p');mobileStatus.id='mobileConfirmationStatus';mobileStatus.className='mobile-confirmation-status';mobileStatus.setAttribute('role','status');$('cardDialog').append(mobileStatus);
 function currentRoomCode(){return roomConnection?.code||'Sin sala';}
 async function roomRequest(endpoint,data){
@@ -267,7 +278,7 @@ function applyRoomState(state){
  $('phoneStatus').textContent=online.length+' jugador'+(online.length===1?'':'es')+' conectado'+(online.length===1?'':'s');
  const code=state.code;
  $('copyRoom').replaceChildren(document.createTextNode(code+' ▣'));
- $('lobbyCopy').replaceChildren(document.createTextNode(code+' ▣'));$('lobbyCopy').setAttribute('aria-label','Copiar código de sala '+code);
+ $('lobbyCopy').replaceChildren(document.createTextNode(code));$('lobbyCopy').setAttribute('aria-label','Copiar código de sala '+code);
  renderLobby();
  if(state.config)$('phoneStatus').textContent+=(state.config.mode==='virtual'?' · Virtual':' · Presencial');
  if(state.resolution?.id!==lastResolutionId){
