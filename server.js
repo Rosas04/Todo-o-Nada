@@ -26,11 +26,9 @@ function createServer({statePath=null,publicUrl=process.env.PUBLIC_URL||process.
   disk.mkdirSync(path.dirname(statePath),{recursive:true});disk.writeFileSync(statePath+'.tmp',JSON.stringify(saved));disk.renameSync(statePath+'.tmp',statePath);
  }
  function json(res,status,data){res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(data));}
- function snapshot(room,identity){return {code:room.code,phase:room.phase,serverNow:Date.now(),turnClock:room.turnClock?{playerId:room.turnClock.playerId,deadline:room.turnClock.deadline,limitSeconds:15}:null,config:{mode:room.config.mode,expectedPlayers:room.config.expectedPlayers},dealId:room.dealId||null,dealtAt:room.dealtAt||null,...(identity.role==='host'?{reactions:room.phase==='finished'?[]:room.reactions||[]}:{}),topCard:room.topCard||null,activeColors:activeColors(room),activeColor:room.activeColor||room.topCard?.color||null,direction:room.direction||1,lastPlay:room.lastPlay||null,diceTask:room.diceTask||null,diceResult:room.diceResult||null,penalty:room.penalty||null,winnerId:room.winnerId||null,deckRemaining:room.deck?.length??null,turnPlayerId:room.turnPlayerId||null,...(identity.role==='player'?{hand:room.players.get(identity.id)?.eliminated?[]:room.players.get(identity.id)?.hand||[],canDraw:game.canDraw(room,identity.id),canPass:game.canPass(room,identity.id),playableCardIds:(room.players.get(identity.id)?.hand||[]).filter(card=>game.canPlay(room,identity.id,card)).map(card=>card.id)}:{}),resolution:room.resolution||null,players:[...room.players.values()].map(p=>({id:p.id,name:p.name,avatar:p.avatar||avatars[0].file,connected:p.streams.size>0,cardCount:p.hand?.length??null,eliminated:Boolean(p.eliminated),eliminationReason:p.eliminationReason||null})),pending:identity.role==='host'||room.pending?.playerId===identity.id?room.pending:null};}
- function broadcast(room){game.syncTurnClock(room);persist();for(const client of room.clients){if(client.res.destroyed||client.res.writableEnded)continue;client.res.write('data: '+JSON.stringify(snapshot(room,client.identity))+'\n\n');}}
- async function body(req){let bytes=0,parts=[];for await(const chunk of req){bytes+=chunk.length;if(bytes>12000)throw Error('Solicitud demasiado grande');parts.push(chunk);}const auth=authenticate(req,new URL(req.url,'http://localhost'));
- if(auth&&['/api/play','/api/draw','/api/pass','/api/dice','/api/penalty','/api/complete'].includes(req.url.split('?')[0])&&game.expireTurn(auth.room)){broadcast(auth.room);throw Error('El tiempo se agotó. El jugador quedó descalificado.');}
- return JSON.parse(Buffer.concat(parts).toString()||'{}');}
+ function snapshot(room,identity){return {code:room.code,phase:room.phase,config:{mode:room.config.mode,expectedPlayers:room.config.expectedPlayers},dealId:room.dealId||null,dealtAt:room.dealtAt||null,...(identity.role==='host'?{reactions:room.phase==='finished'?[]:room.reactions||[]}:{}),topCard:room.topCard||null,activeColors:activeColors(room),activeColor:room.activeColor||room.topCard?.color||null,direction:room.direction||1,lastPlay:room.lastPlay||null,diceTask:room.diceTask||null,diceResult:room.diceResult||null,penalty:room.penalty||null,winnerId:room.winnerId||null,deckRemaining:room.deck?.length??null,turnPlayerId:room.turnPlayerId||null,...(identity.role==='player'?{hand:room.players.get(identity.id)?.eliminated?[]:room.players.get(identity.id)?.hand||[],canDraw:game.canDraw(room,identity.id),canPass:game.canPass(room,identity.id),playableCardIds:(room.players.get(identity.id)?.hand||[]).filter(card=>game.canPlay(room,identity.id,card)).map(card=>card.id)}:{}),resolution:room.resolution||null,players:[...room.players.values()].map(p=>({id:p.id,name:p.name,avatar:p.avatar||avatars[0].file,connected:p.streams.size>0,cardCount:p.hand?.length??null,eliminated:Boolean(p.eliminated),eliminationReason:p.eliminationReason||null})),pending:identity.role==='host'||room.pending?.playerId===identity.id?room.pending:null};}
+ function broadcast(room){persist();for(const client of room.clients){if(client.res.destroyed||client.res.writableEnded)continue;client.res.write('data: '+JSON.stringify(snapshot(room,client.identity))+'\n\n');}}
+ async function body(req){let bytes=0,parts=[];for await(const chunk of req){bytes+=chunk.length;if(bytes>12000)throw Error('Solicitud demasiado grande');parts.push(chunk);}return JSON.parse(Buffer.concat(parts).toString()||'{}');}
  function authenticate(req,url){const token=req.headers.authorization?.replace(/^Bearer /,'')||url.searchParams.get('token');for(const room of rooms.values()){if(token===room.hostToken)return {room,identity:{role:'host'}};for(const player of room.players.values())if(token===player.token)return {room,identity:{role:'player',id:player.id}};}return null;}
  const server=http.createServer(async(req,res)=>{try{
   res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');
@@ -60,8 +58,6 @@ function createServer({statePath=null,publicUrl=process.env.PUBLIC_URL||process.
    }
    const auth=authenticate(req,url);if(!auth)return json(res,401,{error:'Vuelve a conectar con la sala.'});
    const {room,identity}=auth;
-   if(game.expireTurn(room))broadcast(room);
-   if(identity.role==='player'&&room.players.get(identity.id)?.eliminated&&req.method==='POST'&&!['/api/reaction','/api/leave'].includes(pathname))return json(res,409,{error:'Estás descalificado: '+room.players.get(identity.id).eliminationReason});
    if(pathname==='/api/reaction'&&req.method==='POST'){
     if(identity.role!=='player')return json(res,403,{error:'Las reacciones se envían desde el jugador.'});
     const data=await body(req),allowed=['😂','🔥','😎','💜','👍','😮','👏','🎉'];
@@ -148,17 +144,12 @@ function createServer({statePath=null,publicUrl=process.env.PUBLIC_URL||process.
   }
   const file=path.resolve(root,'.'+(pathname==='/play'?'/mobile.html':['/','/host'].includes(pathname)?'/index.html':pathname));
   const relative=path.relative(root,file);
-  if(!file.startsWith(root+path.sep)||(!['index.html','avatars.js','app.js','deal-animation.js','cards.js','styles.css','turn-clock.js','turn-clock.css','screen.css','mobile-screen.css','mobile.html','mobile.js','mobile.css'].includes(relative)&&file!==path.join(root,'vendor','qrcode.js')&&!file.startsWith(path.join(root,'Resource')+path.sep)&&file!==path.join(root,'Rules','Reglas_Todo_o_Nada.md')&&file!==path.join(root,'Rules','Rules.png')))return json(res,403,{error:'Acceso no permitido'});
+  if(!file.startsWith(root+path.sep)||(!['index.html','avatars.js','app.js','deal-animation.js','cards.js','styles.css','screen.css','mobile-screen.css','mobile.html','mobile.js','mobile.css'].includes(relative)&&file!==path.join(root,'vendor','qrcode.js')&&!file.startsWith(path.join(root,'Resource')+path.sep)&&file!==path.join(root,'Rules','Reglas_Todo_o_Nada.md')&&file!==path.join(root,'Rules','Rules.png')))return json(res,403,{error:'Acceso no permitido'});
   const content=await fs.readFile(file);res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'});res.end(content);
  }catch(error){if(!res.headersSent)json(res,error.code==='ENOENT'?404:400,{error:error.code==='ENOENT'?'No encontrado':'Solicitud no válida'});else res.end();}});
- let clockTicker;
- server.on('listening',()=>{
-  for(const room of rooms.values()){game.expireTurn(room);game.syncTurnClock(room);}
-  clockTicker=setInterval(()=>{if(!shuttingDown)for(const room of rooms.values())if(game.expireTurn(room))broadcast(room);},100);clockTicker.unref();
- });
- server.on('close',()=>{clearInterval(clockTicker);for(const room of rooms.values()){const clients=[...room.clients];room.clients.clear();for(const client of clients)client.res.end();}});
+ server.on('close',()=>{for(const room of rooms.values()){const clients=[...room.clients];room.clients.clear();for(const client of clients)client.res.end();}});
  server.shutdown=()=>{
-  if(shuttingDown)return;shuttingDown=true;clearInterval(clockTicker);persist();
+  if(shuttingDown)return;shuttingDown=true;persist();
   for(const room of rooms.values())for(const client of [...room.clients])client.res.end();
   server.close();
   const deadline=setTimeout(()=>server.closeAllConnections(),5000);deadline.unref();
