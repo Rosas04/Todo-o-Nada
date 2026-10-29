@@ -11,6 +11,19 @@ PLAYER_AVATARS.forEach(avatar=>{
  image.src=mobileAsset('Users/Sin Fondo/'+avatar.file);image.alt='';label.title=avatar.name;label.append(input,image);el('avatarOptions').append(label);
 });
 async function playerRequest(endpoint,data){const response=await fetch(endpoint,{method:data===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(playerSession?{Authorization:'Bearer '+playerSession.token}:{})},...(data===undefined?{}:{body:JSON.stringify(data)})});const result=await response.json();if(!response.ok)throw Error(result.error||'No se pudo conectar.');return result;}
+function renderTaskApproval(task){
+ const judged=Boolean(task?.judgeId),canJudge=judged&&task.judgeId===playerSession?.id;
+ el('rejectTask').hidden=!canJudge;el('rejectTask').disabled=submitting;
+ if(!judged){if(task)el('mobileTaskStatus').textContent='';return;}
+ el('completeTask').hidden=!canJudge;el('completeTask').disabled=submitting;
+ el('completeTask').textContent='CUMPLIDO';
+ const responder=playerState.players.find(p=>p.id===task.playerId)?.name||'El jugador';
+ const judge=playerState.players.find(p=>p.id===task.judgeId)?.name||'Quien lanzó la carta';
+ el('mobileTaskTitle').textContent=canJudge?'Evalúa el cumplimiento':'Tu pregunta o reto';
+ el('mobileTaskStatus').textContent=canJudge?'¿'+responder+' cumplió? Confirma el resultado.':judge+' confirmará si se cumplió.';
+ el('mobileTurnLabel').textContent=canJudge?'EVALÚA EL CUMPLIMIENTO':'RESPONDE O CUMPLE EL RETO';
+ el('mobileTurnHint').textContent=canJudge?'Tú lanzaste esta carta':'Espera la confirmación de '+judge;
+}
 function renderMobile(state){
  playerState=state;el('mobileEntry').hidden=true;el('joinMobile').hidden=true;
  const waiting=state.phase==='lobby'&&!['hand','task','selection'].includes(mobilePreview);
@@ -30,7 +43,9 @@ function renderMobile(state){
  renderRoster(state.players);renderHand(false);
  if(task){el('mobileTaskText').textContent=task.text;el('mobileTaskTitle').textContent=task.kind==='question'?'Tu pregunta':task.kind==='challenge'?'Tu reto':'Tu carta';el('completeTask').textContent=task.kind==='question'?'PREGUNTA RESPONDIDA':task.kind==='challenge'?'RETO CUMPLIDO':'PREGUNTA O RETO CUMPLIDO';}
  if(task){
-  if(!el('mobileCardDialog').open)el('mobileCardDialog').showModal();
+  const portrait=matchMedia('(orientation: portrait) and (max-width:700px)').matches;
+  if(portrait&&el('mobileCardDialog').open)el('mobileCardDialog').close();
+  if(!portrait&&!el('mobileCardDialog').open)el('mobileCardDialog').showModal();
   if(task.id!==lastDisplayedTaskId){
    lastDisplayedTaskId=task.id;
    el('mobileTask').classList.remove('zoom-arrival');void el('mobileTask').offsetWidth;el('mobileTask').classList.add('zoom-arrival');
@@ -82,6 +97,7 @@ function renderGameActions(){
   if(state.diceResult.playerId===playerSession?.id&&(previous!==null||gameActionBusy))showDiceResult(state.diceResult);
  }
  if(lastDiceResultId===null&&!state.diceResult)lastDiceResultId='none';
+ renderTaskApproval(state.pending);
  if(state.config?.mode==='presencial'&&state.pending?.action==='next-dice'){
   el('mobileTaskStatus').textContent='Elijan en voz alta quién lanza el dado físico. Confirma después de la tirada.';
   el('completeTask').textContent='DADO FÍSICO LANZADO';
@@ -101,7 +117,7 @@ function showDiceResult(result){
  clearTimeout(diceAnimationTimer);el('mobileDiceTitle').textContent='Tu tirada';el('mobileDiceMessage').textContent='';
  el('mobileDiceCube').hidden=false;el('mobileDiceCube').textContent='?';el('mobileDiceCube').classList.remove('rolling');void el('mobileDiceCube').offsetWidth;el('mobileDiceCube').classList.add('rolling');
  el('mobileDiceDone').textContent='CONTINUAR';el('mobileDiceDone').disabled=true;
- if(!el('mobileDiceDialog').open)el('mobileDiceDialog').showModal();
+ if(matchMedia('(orientation: portrait) and (max-width:700px)').matches)suspendedDiceDialog=true;else if(!el('mobileDiceDialog').open)el('mobileDiceDialog').showModal();
  diceAnimationTimer=setTimeout(()=>{el('mobileDiceCube').classList.remove('rolling');el('mobileDiceCube').textContent=String(result.value);el('mobileDiceMessage').textContent='Resultado: '+result.value;el('mobileDiceDone').disabled=false;},matchMedia('(prefers-reduced-motion: reduce)').matches?0:1000);
 }
 el('mobileDice').addEventListener('click',()=>{
@@ -128,7 +144,27 @@ const invitedRoom=(new URLSearchParams(location.search).get('room')||'').trim().
 el('joinCode').value=invitedRoom;
 if(invitedRoom){el('joinMobile').querySelector('h1').textContent='ENTRAR A LA SALA '+invitedRoom;el('joinName').focus();}
 el('joinMobile').addEventListener('submit',async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{playerSession=await playerRequest('/api/join',{code:el('joinCode').value.trim().toUpperCase(),name:el('joinName').value.trim(),avatar:selectedAvatar});try{sessionStorage.setItem('todo-nada-phone',JSON.stringify(playerSession));}catch{}await connectMobile();}catch(error){el('mobileStatus').textContent=error.message;}finally{button.disabled=false;}});
-el('completeTask').addEventListener('click',async()=>{if(submitting||!playerState?.pending)return;if(['task','selection'].includes(mobilePreview)){renderMobile({...playerState,pending:null});renderHand(true);el('mobileStatus').textContent='Vista de diseño · confirmación de ejemplo';return;}submitting=true;el('completeTask').disabled=true;const taskId=playerState.pending.id;try{await playerRequest('/api/complete',{taskId,selectedPlayerId:selectedTargetId});el('mobileStatus').textContent='¡Confirmado! La carta se cerró en la mesa.';renderMobile(await playerRequest('/api/state'));}catch(error){el('mobileStatus').textContent=error.message;el('mobileTaskStatus').textContent=error.message;}finally{submitting=false;renderPlayerSelection(playerState?.pending);}});
+async function submitTask(fulfilled=true){
+ if(submitting||!playerState?.pending)return;
+ if(['task','selection'].includes(mobilePreview)){renderMobile({...playerState,pending:null});renderHand(true);el('mobileStatus').textContent='Vista de diseño · confirmación de ejemplo';return;}
+ submitting=true;el('completeTask').disabled=true;el('rejectTask').disabled=true;
+ const task=playerState.pending;
+ try{await playerRequest('/api/complete',{taskId:task.id,selectedPlayerId:selectedTargetId,...(task.judgeId?{fulfilled}:{})});el('mobileStatus').textContent=fulfilled?'¡Confirmado!':'No cumplido. Corresponde lanzar el dado.';renderMobile(await playerRequest('/api/state'));}
+ catch(error){el('mobileStatus').textContent=error.message;el('mobileTaskStatus').textContent=error.message;}
+ finally{submitting=false;renderPlayerSelection(playerState?.pending);}
+}
+el('completeTask').addEventListener('click',()=>submitTask(true));
+el('rejectTask').addEventListener('click',()=>submitTask(false));
+el('landscapeMode').addEventListener('click',async()=>{
+ try{if(!document.fullscreenElement)await document.documentElement.requestFullscreen?.();}catch{}
+ try{await screen.orientation?.lock?.('landscape');}catch{}
+});
+let suspendedDiceDialog=false;
+matchMedia('(orientation: portrait) and (max-width:700px)').addEventListener('change',event=>{
+ if(event.matches&&el('mobileDiceDialog').open){suspendedDiceDialog=true;el('mobileDiceDialog').close();}
+ if(playerState)renderMobile(playerState);
+ if(!event.matches&&suspendedDiceDialog){suspendedDiceDialog=false;el('mobileDiceDialog').showModal();}
+});
 el('mobileCardDialog').addEventListener('cancel',e=>e.preventDefault());
 async function leaveMobileRoom(){if(!['hand','task','selection'].includes(mobilePreview)){try{await playerRequest('/api/leave',{});}catch(error){el('mobileStatus').textContent=error.message;return;}}mobileStream?.close();mobileStream=null;playerSession=null;playerState=null;try{sessionStorage.removeItem('todo-nada-phone');}catch{}el('mobileEntry').hidden=false;el('joinMobile').hidden=false;el('mobileGame').hidden=true;el('mobileLobby').hidden=true;document.body.classList.remove('is-playing');el('mobileStatus').textContent='Saliste de la sala.';}
 el('leaveMobile').addEventListener('click',leaveMobileRoom);

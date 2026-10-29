@@ -46,7 +46,7 @@ La regla también se aplica al cargar partidas anteriores con manos que ya super
 
 Solo el destinatario puede lanzar el dado. En virtual el servidor genera un entero de 1 a 6 y móvil/principal muestran el mismo resultado animado; repetir la petición no vuelve a sortear. En presencial se indica lanzar el dado físico y confirmar. La elección presencial de quién lanza se hace por voz, sin lista digital.
 
-cards.js contiene los textos de las 14 cartas numéricas escritas revisadas. Se muestran ampliadas con zoom, sin títulos adicionales. El jugador asignado confirma en el móvil para cerrar las dos vistas. En virtual las cartas que piden elegir otra persona muestran participantes conectados que no estén eliminados. Verdad o reto muestra la duda sin generar una pregunta; se propone verbalmente.
+cards.js contiene los textos de las 14 cartas numéricas escritas revisadas. Se muestran ampliadas con zoom, sin títulos adicionales. En preguntas y retos, quien lanzó la carta evalúa Cumplido o No cumplido desde su móvil; el receptor espera esa evaluación. Las acciones de selección conservan su confirmación específica. En virtual las cartas que piden elegir otra persona muestran participantes conectados que no estén eliminados. Verdad o reto muestra la duda sin generar una pregunta; se propone verbalmente.
 
 Reversa cambia la dirección y bloqueo salta al siguiente jugador. Los efectos de la última carta se resuelven antes de anunciar la victoria.
 
@@ -72,7 +72,7 @@ node --check deal-animation.js
 node --test tests/confirmations.test.js tests/game.test.js tests/reactions.test.js tests/invitations.test.js tests/avatars.test.js
 ```
 
-34 pruebas: privacidad y persistencia, ocho cartas, permisos de turno/propiedad/color/tipo, doble robo simultáneo, una carta por turno, pasar después de robar, umbral 25/26, eliminación por acumulación, suma de penalizaciones y reinicio de la cuenta al cumplirlas, turnos que saltan eliminados, dado virtual/físico, selecciones, victoria, historial de varias reacciones y limpieza al iniciar/terminar. En navegador se verificaron la animación inicial, robo con Pasar turno y dos reacciones del mismo jugador conservadas al recargar.
+35 pruebas: privacidad y persistencia, ocho cartas, permisos de turno/propiedad/color/tipo, doble robo simultáneo, una carta por turno, pasar después de robar, umbral 25/26, eliminación por acumulación, suma de penalizaciones y reinicio de la cuenta al cumplirlas, turnos que saltan eliminados, dado virtual/físico, selecciones, victoria, historial de varias reacciones y limpieza al iniciar/terminar. En navegador se verificaron la animación inicial, robo con Pasar turno y dos reacciones del mismo jugador conservadas al recargar.
 
 Vistas visuales sin conexión: /play?preview=hand, /play?preview=task y /play?preview=selection.
 
@@ -85,3 +85,9 @@ Al publicar, puede configurarse PUBLIC_URL con el origen HTTPS del juego. Si no 
 ## Avatares
 
 Al unirse, cada jugador elige uno de los seis avatares transparentes de Resource/Users/Sin Fondo. avatars.js comparte el catálogo entre el servidor y las pantallas. El servidor valida la selección y la conserva con la sesión. El lobby, la mesa, el turno y la lista móvil muestran esa misma imagen. Las salas anteriores reciben un avatar predeterminado compatible.
+
+## Evaluación y orientación móvil
+
+Las preguntas, los retos y Verdad o reto guardan al emisor como evaluador. Solo su sesión puede marcar Cumplido o No cumplido. El receptor ve la carta y espera; terceros no reciben esa carta privada. No cumplido activa el dado para el receptor y respeta la modalidad virtual/presencial. Las evaluaciones repetidas no cambian el resultado ya registrado.
+
+El teléfono se usa en horizontal. En vertical aparece una guía para girarlo, también al ingresar. El botón de pantalla completa intenta fijar orientación horizontal si el navegador lo permite; en los demás casos se gira el dispositivo manualmente.

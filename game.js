@@ -59,8 +59,8 @@ function playCard(room,playerId,cardId){
  else if(content){
   setTurn(room,next);
   const responder=content.selection==='player'?playerId:next;
-  room.pending={id:crypto.randomUUID(),cardId:content.id,text:content.text,kind:content.kind,playerId:responder,selection:content.selection||null,requiresSelection:content.selection==='player'&&room.config.mode==='virtual',action:content.action||null,sourcePlayId:room.lastPlay.id};
- }else if(effect==='choice'){setTurn(room,next);room.pending={id:crypto.randomUUID(),text:'Verdad o reto',kind:'spoken',playerId:next,publicModal:false,requiresSelection:false,sourcePlayId:room.lastPlay.id};}
+  room.pending={id:crypto.randomUUID(),cardId:content.id,text:content.text,kind:content.kind,playerId:responder,judgeId:['question','challenge'].includes(content.kind)?playerId:null,selection:content.selection||null,requiresSelection:content.selection==='player'&&room.config.mode==='virtual',action:content.action||null,sourcePlayId:room.lastPlay.id};
+ }else if(effect==='choice'){setTurn(room,next);room.pending={id:crypto.randomUUID(),text:'Verdad o reto',kind:'spoken',playerId:next,judgeId:playerId,publicModal:false,requiresSelection:false,sourcePlayId:room.lastPlay.id};}
  else advance(room,playerId);
  finishIfReady(room);return room.lastPlay;
 }
@@ -80,8 +80,9 @@ function drawOne(room,playerId){
  return {count:amount,eliminated:Boolean(player.eliminated)};
 }
 function passTurn(room,playerId){requireGame(room);if(!canPass(room,playerId))throw Error('Puedes pasar después de coger una carta que no puedas jugar.');advance(room,playerId);return {ok:true};}
-function completeAction(room,selected){
+function completeAction(room,selected,fulfilled=true){
  const task=room.pending;
+ if(task?.judgeId&&fulfilled===false){setDice(room,task.playerId,'failed-challenge');room.pending=null;finishIfReady(room);return;}
  if(task?.action==='next-dice'){
   if(room.config.mode==='virtual')setDice(room,selected.id,'selection');
   // In person the choice and physical throw are made aloud before confirming.

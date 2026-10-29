@@ -274,10 +274,10 @@ function applyRoomState(state){
   const previous=lastResolutionId;lastResolutionId=state.resolution?.id||null;
   if(state.resolution?.selectedName&&(previous||remoteTaskId))toast(state.resolution.actor+' eligió a '+state.resolution.selectedName);
  }
- const target=state.players.find(p=>p.id===state.pending?.playerId);
+ const target=state.players.find(p=>p.id===(state.pending?.judgeId||state.pending?.playerId));
  if(state.pending){
   if(!remoteTaskId&&$('cardDialog').open&&$('cardDialog').classList.contains('text-only'))remoteTaskId=state.pending.id;
-  mobileStatus.textContent=target?(target.connected?'Esperando confirmación de '+target.name:'Esperando a que '+target.name+' vuelva a conectarse'):'Esperando al jugador que responderá';
+  mobileStatus.textContent=target?(target.connected?(state.pending?.judgeId?'Esperando evaluación de ':'Esperando confirmación de ')+target.name:'Esperando a que '+target.name+' vuelva a conectarse'):'Esperando al jugador que responderá';
   maybeAssignPlayer();
  }else if(remoteTaskId){
   remoteTaskId=null;
