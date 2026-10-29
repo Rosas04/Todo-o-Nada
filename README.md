@@ -1,6 +1,10 @@
 # TODO O NADA
 
-Juego local con pantalla principal del árbitro y controles privados en el celular.
+Juego web con pantalla principal del árbitro y controles privados en el celular. Preparado para ejecución local o publicación en Render.
+
+## Publicar en Render
+
+El repositorio incluye render.yaml y las instrucciones en [DEPLOY_RENDER.md](DEPLOY_RENDER.md). Solo queda importar el repositorio como Blueprint y confirmar el despliegue. Usa un servicio Starter y disco persistente de 1 GB, ambos de pago. No se ha creado ni contratado un servicio.
 
 ## Abrir
 
@@ -10,7 +14,7 @@ Requiere Node.js, sin dependencias:
 node server.js
 ```
 
-PC: http://127.0.0.1:5173/#home. El lobby muestra el enlace de red para abrir /play en los celulares. La conexión actual es local; acceder desde distintas redes requiere publicar el servidor.
+PC: http://127.0.0.1:5173/#home. El lobby muestra el enlace de red para abrir /play en los celulares. Para acceder desde distintas redes, publica el servidor con el Blueprint de Render incluido.
 
 ## Sala y reparto
 
@@ -18,7 +22,7 @@ Se configuran cantidad de jugadores (2–100) y modalidad presencial o virtual. 
 
 Al iniciar, PC y móviles muestran una animación breve de barajar y repartir. Las cartas entran en la mano de forma escalonada. La animación se identifica por el reparto y no se repite al recargar una partida antigua. Respeta la preferencia de reducir movimiento.
 
-Cada teléfono recibe solo su mano. La principal recibe cantidades, turno, dirección y descarte. Las salas, credenciales, manos y reacciones se guardan en .runtime/rooms.json, excluido del repositorio y del servidor de archivos. Recargar o reiniciar conserva la sesión.
+Cada teléfono recibe solo su mano. La principal recibe cantidades, turno, dirección y descarte. Las salas, credenciales, manos y reacciones se guardan en .runtime/rooms.json en local, o en DATA_DIR/rooms.json en Render, excluido del repositorio y del servidor de archivos. Recargar o reiniciar conserva la sesión.
 
 ## Jugar, coger y pasar
 
@@ -68,7 +72,7 @@ node --check deal-animation.js
 node --test tests/confirmations.test.js tests/game.test.js tests/reactions.test.js tests/invitations.test.js tests/avatars.test.js
 ```
 
-30 pruebas: privacidad y persistencia, ocho cartas, permisos de turno/propiedad/color/tipo, doble robo simultáneo, una carta por turno, pasar después de robar, umbral 25/26, eliminación por acumulación, suma de penalizaciones y reinicio de la cuenta al cumplirlas, turnos que saltan eliminados, dado virtual/físico, selecciones, victoria, historial de varias reacciones y limpieza al iniciar/terminar. En navegador se verificaron la animación inicial, robo con Pasar turno y dos reacciones del mismo jugador conservadas al recargar.
+33 pruebas: privacidad y persistencia, ocho cartas, permisos de turno/propiedad/color/tipo, doble robo simultáneo, una carta por turno, pasar después de robar, umbral 25/26, eliminación por acumulación, suma de penalizaciones y reinicio de la cuenta al cumplirlas, turnos que saltan eliminados, dado virtual/físico, selecciones, victoria, historial de varias reacciones y limpieza al iniciar/terminar. En navegador se verificaron la animación inicial, robo con Pasar turno y dos reacciones del mismo jugador conservadas al recargar.
 
 Vistas visuales sin conexión: /play?preview=hand, /play?preview=task y /play?preview=selection.
 

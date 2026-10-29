@@ -1,0 +1,22 @@
+# Una sola instancia: las salas activas se coordinan dentro del servidor.
+services:
+  - type: web
+    name: todo-o-nada
+    runtime: node
+    plan: starter
+    branch: main
+    numInstances: 1
+    buildCommand: node scripts/check.js && node --test tests/*.test.js
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    autoDeployTrigger: 'off'
+    maxShutdownDelaySeconds: 15
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+    disk:
+      name: partidas
+      mountPath: /var/data
+      sizeGB: 1

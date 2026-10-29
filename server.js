@@ -10,8 +10,10 @@ const game=require('./game');
 const avatars=require('./avatars');
 const root=__dirname;
 const types={'.html':'text/html; charset=utf-8','.css':'text/css','.js':'text/javascript','.png':'image/png','.jpg':'image/jpeg','.md':'text/plain; charset=utf-8'};
-function createServer({statePath=null,publicUrl=process.env.PUBLIC_URL||null}={}){
+function createServer({statePath=null,publicUrl=process.env.PUBLIC_URL||process.env.RENDER_EXTERNAL_URL||null,trustProxy=false}={}){
  if(publicUrl){const address=new URL(publicUrl);if(!['https:','http:'].includes(address.protocol)||address.username||address.password)throw Error('PUBLIC_URL debe ser una dirección HTTP o HTTPS.');publicUrl=address.origin;}
+ if(statePath){disk.mkdirSync(path.dirname(statePath),{recursive:true});disk.accessSync(path.dirname(statePath),disk.constants.W_OK);}
+ let shuttingDown=false;
  const rooms=new Map();
  const reactionTimes=new WeakMap();
  if(statePath&&disk.existsSync(statePath)){
@@ -29,9 +31,15 @@ function createServer({statePath=null,publicUrl=process.env.PUBLIC_URL||null}={}
  async function body(req){let bytes=0,parts=[];for await(const chunk of req){bytes+=chunk.length;if(bytes>12000)throw Error('Solicitud demasiado grande');parts.push(chunk);}return JSON.parse(Buffer.concat(parts).toString()||'{}');}
  function authenticate(req,url){const token=req.headers.authorization?.replace(/^Bearer /,'')||url.searchParams.get('token');for(const room of rooms.values()){if(token===room.hostToken)return {room,identity:{role:'host'}};for(const player of room.players.values())if(token===player.token)return {room,identity:{role:'player',id:player.id}};}return null;}
  const server=http.createServer(async(req,res)=>{try{
+  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');
   const url=new URL(req.url,'http://localhost'),pathname=decodeURIComponent(url.pathname);
+  if(pathname==='/healthz')return json(res,shuttingDown?503:200,{status:shuttingDown?'stopping':'ok'});
+  if(shuttingDown)return json(res,503,{error:'Reconectando con el juego. Intenta de nuevo en unos segundos.'});
   if(pathname.startsWith('/api/')){
-   if(req.headers.origin&&req.headers.origin!==new URL('http://'+req.headers.host).origin)return json(res,403,{error:'Origen no permitido'});
+   const forwardedProtocol=String(req.headers['x-forwarded-proto']||'').split(',')[0].trim();
+   const protocol=req.socket.encrypted?'https':trustProxy&&forwardedProtocol==='https'?'https':'http';
+   const requestOrigin=new URL(protocol+'://'+req.headers.host).origin;
+   if(req.headers.origin&&req.headers.origin!==requestOrigin&&req.headers.origin!==publicUrl)return json(res,403,{error:'Origen no permitido'});
    if(pathname==='/api/rooms'&&req.method==='POST'){
     const data=await body(req),mode=data.mode||'presencial',expectedPlayers=data.expectedPlayers??2;
     if(!['presencial','virtual'].includes(mode)||!Number.isInteger(expectedPlayers)||expectedPlayers<2||expectedPlayers>100)return json(res,400,{error:'Elige una modalidad y una cantidad de 2 a 100 jugadores.'});
@@ -91,7 +99,7 @@ function createServer({statePath=null,publicUrl=process.env.PUBLIC_URL||null}={}
     return json(res,200,data);
    }
    if(pathname==='/api/events'&&req.method==='GET'){
-    res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store','Connection':'keep-alive','X-Accel-Buffering':'no'});res.write(': connected\n\n');
+    res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store','Connection':'keep-alive','X-Accel-Buffering':'no'});res.write('retry: 1500\n: connected\n\n');
     const client={res,identity};room.clients.add(client);
     const player=room.players.get(identity.id);if(player)player.streams.add(client);
     broadcast(room);const heartbeat=setInterval(()=>res.write(': keepalive\n\n'),20000);heartbeat.unref();
@@ -140,9 +148,22 @@ function createServer({statePath=null,publicUrl=process.env.PUBLIC_URL||null}={}
   const content=await fs.readFile(file);res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Cache-Control':'no-store'});res.end(content);
  }catch(error){if(!res.headersSent)json(res,error.code==='ENOENT'?404:400,{error:error.code==='ENOENT'?'No encontrado':'Solicitud no válida'});else res.end();}});
  server.on('close',()=>{for(const room of rooms.values()){const clients=[...room.clients];room.clients.clear();for(const client of clients)client.res.end();}});
+ server.shutdown=()=>{
+  if(shuttingDown)return;shuttingDown=true;persist();
+  for(const room of rooms.values())for(const client of [...room.clients])client.res.end();
+  server.close();
+  const deadline=setTimeout(()=>server.closeAllConnections(),5000);deadline.unref();
+  server.once('close',()=>clearTimeout(deadline));
+ };
  return server;
 }
-if(require.main===module)createServer({statePath:path.join(__dirname,'.runtime','rooms.json')}).listen(5173,'0.0.0.0',()=>console.log('TODO O NADA · http://127.0.0.1:5173 · móviles en /play'));
+if(require.main===module){
+ const {runtimeConfig}=require('./runtime-config');
+ const config=runtimeConfig(),server=createServer(config);
+ server.listen(config.port,config.host,()=>console.log('TODO O NADA · '+(config.publicUrl||'http://127.0.0.1:'+server.address().port)+' · móviles en /play'));
+ server.on('error',error=>{console.error('No se pudo iniciar el juego: '+error.message);process.exitCode=1;});
+ for(const signal of ['SIGTERM','SIGINT'])process.once(signal,()=>server.shutdown());
+}
 module.exports={createServer};
 
 
