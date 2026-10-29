@@ -12,7 +12,7 @@ PLAYER_AVATARS.forEach(avatar=>{
 });
 async function playerRequest(endpoint,data){const response=await fetch(endpoint,{method:data===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(playerSession?{Authorization:'Bearer '+playerSession.token}:{})},...(data===undefined?{}:{body:JSON.stringify(data)})});const result=await response.json();if(!response.ok)throw Error(result.error||'No se pudo conectar.');return result;}
 function renderMobile(state){
- playerState=state;el('mobileEntry').hidden=true;el('joinMobile').hidden=true;
+ playerState=state;window.updateTurnClock?.(state);el('mobileEntry').hidden=true;el('joinMobile').hidden=true;
  const waiting=state.phase==='lobby'&&!['hand','task','selection'].includes(mobilePreview);
  el('mobileLobby').hidden=!waiting;el('mobileGame').hidden=waiting;document.body.classList.toggle('is-playing',!waiting);
  if(waiting){
@@ -24,7 +24,7 @@ function renderMobile(state){
  el('mobilePlayer').textContent=playerSession.name+' · SALA '+state.code;
  const task=state.pending;if(task?.id!==lastDisplayedTaskId)selectedTargetId=null;el('mobileWaiting').hidden=false;el('mobileTask').hidden=!task;
  const eliminated=Boolean(state.players.find(player=>player.id===playerSession?.id)?.eliminated);
- el('mobileWaiting').hidden=eliminated;el('eliminatedMessage').hidden=!eliminated;
+ el('eliminatedMessage').querySelector('p').textContent=state.players.find(player=>player.id===playerSession?.id)?.eliminationReason||'Has quedado descalificado.';el('mobileWaiting').hidden=eliminated;el('eliminatedMessage').hidden=!eliminated;
  el('completeTask').hidden=!task;el('mobileDice').hidden=Boolean(task);el('mobileDraw').hidden=Boolean(task);
  el('mobileTurnLabel').textContent=task?'— TU TURNO —':(state.hand?.length?'TU MANO':'EN LA SALA');el('mobileTurnHint').textContent=task?'Confirma cuando hayas terminado':(state.hand?.length?'Solo tú puedes ver estas cartas':'Esperando la siguiente carta');
  renderRoster(state.players);renderHand(false);
@@ -75,7 +75,7 @@ function renderGameActions(){
  if(!state.pending){
   const who=state.players.find(p=>p.id===state.turnPlayerId)?.name||'otro jugador';
   el('mobileTurnLabel').textContent=eliminated?'ELIMINADO':state.phase==='finished'?'PARTIDA TERMINADA':canRoll?'TE TOCA EL DADO':myTurn?'— TU TURNO —':'TURNO DE '+who.toUpperCase();
-  el('mobileTurnHint').textContent=eliminated?'Superaste las 25 cartas':canRoll?(state.config?.mode==='virtual'?'Lanza desde el botón del dado':'Lanza el dado físico y confirma'):state.canPass?'Puedes pasar o jugar otra carta':myTurn?(state.canDraw?'Juega una carta o coge una':'Juega una carta'):'Puedes revisar tu mano';
+  el('mobileTurnHint').textContent=eliminated?'Has quedado descalificado':canRoll?(state.config?.mode==='virtual'?'Lanza desde el botón del dado':'Lanza el dado físico y confirma'):state.canPass?'Puedes pasar o jugar otra carta':myTurn?(state.canDraw?'Juega una carta o coge una':'Juega una carta'):'Puedes revisar tu mano';
  }
  if(state.diceResult?.id&&state.diceResult.id!==lastDiceResultId){
   const previous=lastDiceResultId;lastDiceResultId=state.diceResult.id;

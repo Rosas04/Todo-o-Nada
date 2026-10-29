@@ -72,7 +72,7 @@ node --check deal-animation.js
 node --test tests/confirmations.test.js tests/game.test.js tests/reactions.test.js tests/invitations.test.js tests/avatars.test.js
 ```
 
-34 pruebas: privacidad y persistencia, ocho cartas, permisos de turno/propiedad/color/tipo, doble robo simultáneo, una carta por turno, pasar después de robar, umbral 25/26, eliminación por acumulación, suma de penalizaciones y reinicio de la cuenta al cumplirlas, turnos que saltan eliminados, dado virtual/físico, selecciones, victoria, historial de varias reacciones y limpieza al iniciar/terminar. En navegador se verificaron la animación inicial, robo con Pasar turno y dos reacciones del mismo jugador conservadas al recargar.
+40 pruebas: privacidad y persistencia, ocho cartas, permisos de turno/propiedad/color/tipo, doble robo simultáneo, una carta por turno, pasar después de robar, umbral 25/26, eliminación por acumulación, suma de penalizaciones y reinicio de la cuenta al cumplirlas, turnos que saltan eliminados, dado virtual/físico, selecciones, victoria, historial de varias reacciones y limpieza al iniciar/terminar. En navegador se verificaron la animación inicial, robo con Pasar turno y dos reacciones del mismo jugador conservadas al recargar.
 
 Vistas visuales sin conexión: /play?preview=hand, /play?preview=task y /play?preview=selection.
 
@@ -85,3 +85,7 @@ Al publicar, puede configurarse PUBLIC_URL con el origen HTTPS del juego. Si no 
 ## Avatares
 
 Al unirse, cada jugador elige uno de los seis avatares transparentes de Resource/Users/Sin Fondo. avatars.js comparte el catálogo entre el servidor y las pantallas. El servidor valida la selección y la conserva con la sesión. El lobby, la mesa, el turno y la lista móvil muestran esa misma imagen. Las salas anteriores reciben un avatar predeterminado compatible.
+
+## Tiempo de espera
+
+Cada turno o acción pendiente dispone de 15 segundos, controlados por el servidor. La cuenta se muestra en PC y celular y se destaca cuando quedan cinco segundos. Robar o reconectar no extiende el plazo. Al vencer, el jugador queda descalificado, se libera su acción y continúa el siguiente participante activo. El dado, las elecciones, preguntas, retos y penalizaciones pendientes también tienen ese límite para su destinatario. El reloj se detiene en el lobby y al terminar la partida.

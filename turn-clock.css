@@ -1,0 +1,5 @@
+.turn-countdown{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border:1px solid #bfa8d8;border-radius:12px;padding:7px 11px;background:#eee4f8;color:#78559b;font:700 14px 'Outfit',sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap}
+.turn-countdown.urgent{background:#f7dfe7;border-color:#d39aae;color:#aa4667}
+.turn-banner>.turn-countdown{margin-left:auto}.turn-chip>.turn-countdown{font-size:11px;padding:5px 7px;margin-left:6px}
+#cardDialog>.turn-countdown,#mobileCardDialog>.turn-countdown,#mobileDiceDialog>.turn-countdown{position:absolute;top:10px;right:12px;z-index:5;font-size:12px;padding:5px 8px}
+@media(max-height:500px){.turn-countdown{font-size:11px;padding:4px 8px}.turn-chip>.turn-countdown{font-size:9px;padding:3px 5px}}

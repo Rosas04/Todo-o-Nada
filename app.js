@@ -4,7 +4,7 @@ const players=[{name:'Dani',avatar:'pato-sinfondo.png',cards:5},{name:'Vale',ava
 let active=0,sound=false,roomState=null;
 const $=id=>document.getElementById(id);
 function render(){
- $('players').innerHTML=players.map((p,i)=>`<div class="player ${i===active&&!p.eliminated&&roomState?.phase!=='finished'?'active':''}" ${i===active&&!p.eliminated&&roomState?.phase!=='finished'?'aria-current="true"':''}>${i===active&&!p.eliminated&&roomState?.phase!=='finished'?'<span class="active-label">SU TURNO</span>':''}<div class="avatar"><img src="${asset('Users/Sin Fondo/'+p.avatar)}" alt=""></div><div><strong>${escapeHTML(p.name)}</strong><p class="${p.cards===1?'one-card':''}">${p.eliminated?'Eliminado · '+p.cards+' cartas':p.cards===null?(p.connected?'Conectado':'Sin conexión'):`<b>${p.cards}</b> ${p.cards===1?'carta · ¡Última!':'cartas'}`}</p></div></div>`).join('');
+ $('players').innerHTML=players.map((p,i)=>`<div class="player ${i===active&&!p.eliminated&&roomState?.phase!=='finished'?'active':''}" ${i===active&&!p.eliminated&&roomState?.phase!=='finished'?'aria-current="true"':''}>${i===active&&!p.eliminated&&roomState?.phase!=='finished'?'<span class="active-label">SU TURNO</span>':''}<div class="avatar"><img src="${asset('Users/Sin Fondo/'+p.avatar)}" alt=""></div><div><strong>${escapeHTML(p.name)}</strong><p class="${p.cards===1?'one-card':''}">${p.eliminated?(p.eliminationReason?.startsWith('Tiempo agotado')?'Descalificado · Tiempo agotado':'Eliminado · '+p.cards+' cartas'):p.cards===null?(p.connected?'Conectado':'Sin conexión'):`<b>${p.cards}</b> ${p.cards===1?'carta · ¡Última!':'cartas'}`}</p></div></div>`).join('');
  document.querySelector('.players-heading h2 span').textContent=players.length+' jugadores';
  if(!players.length){$('turnName').textContent='Esperando jugadores';$('nextPlayer').textContent='';return;}
  $('turnName').textContent=players[active].name;$('turnAvatar').src=asset('Users/Sin Fondo/'+players[active].avatar);
@@ -231,7 +231,7 @@ async function roomRequest(endpoint,data){
  const result=await response.json();if(!response.ok)throw Error(result.error||'No se pudo conectar.');return result;
 }
 function applyRoomState(state){
- roomState=state;
+ roomState=state;window.updateTurnClock?.(state);
  syncReactionHistory(state);
  window.playDealAnimation?.(state);
  const avatarNames=['pato-sinfondo.png','fantasmacute-sinfondo.png','calavera-sinfondo.png','caraderretida-sinfondo.png'];

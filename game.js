@@ -1,6 +1,21 @@
 const crypto=require('node:crypto');
 const written=require('./cards');
 const {makeDeck,cardColors,cardNumber,activeColors}=require('./deck');
+const TURN_LIMIT_MS=15000;
+function syncTurnClock(room,now=Date.now()){
+ if(room.phase!=='playing'){room.turnClock=null;return;}
+ const playerId=room.pending?.playerId||room.diceTask?.playerId||room.turnPlayerId;
+ if(!playerId||room.players.get(playerId)?.eliminated){room.turnClock=null;return;}
+ const key=room.dealId+':'+(room.turnSerial||0)+':'+(room.pending?.id||room.diceTask?.id||'turn');
+ if(room.turnClock?.key!==key||room.turnClock.playerId!==playerId)room.turnClock={key,playerId,deadline:now+TURN_LIMIT_MS};
+}
+function expireTurn(room,now=Date.now()){
+ syncTurnClock(room,now);
+ if(!room.turnClock||now<room.turnClock.deadline)return false;
+ const player=room.players.get(room.turnClock.playerId);
+ player.eliminated=true;player.eliminationReason='Tiempo agotado: 15 segundos';
+ room.turnClock=null;enforceLimits(room);syncTurnClock(room,now);return true;
+}
 function nextPlayer(room,from,steps=1){
  const ids=[...room.players.keys()];if(!ids.some(id=>!room.players.get(id).eliminated))return null;
  let index=ids.indexOf(from);for(let step=0;step<steps;step++){do{index=(index+(room.direction||1)+ids.length)%ids.length;}while(room.players.get(ids[index]).eliminated);}return ids[index];
@@ -9,7 +24,7 @@ function finishIfReady(room){
  const survivors=[...room.players.values()].filter(player=>!player.eliminated);
  if(survivors.length<=1&&room.players.size>1){room.winnerId=survivors[0]?.id||null;room.phase='finished';room.pending=null;room.diceTask=null;room.penalty=null;}
  else if(room.finisherId&&!room.pending&&!room.diceTask&&!room.penalty){room.winnerId=room.finisherId;room.phase='finished';}
- if(room.phase==='finished')room.reactions=[];
+ if(room.phase==='finished'){room.reactions=[];room.turnClock=null;}
 }
 function setTurn(room,id){room.turnPlayerId=id;room.turnSerial=(room.turnSerial||0)+1;room.drawState=null;}
 function advance(room,from,steps=1){setTurn(room,nextPlayer(room,from,steps));finishIfReady(room);}
@@ -18,6 +33,7 @@ function enforceLimits(room){
  if(room.pending&&room.players.get(room.pending.playerId)?.eliminated)room.pending=null;
  if(room.diceTask&&room.players.get(room.diceTask.playerId)?.eliminated)room.diceTask=null;
  if(room.penalty&&room.players.get(room.penalty.playerId)?.eliminated)room.penalty=null;
+ if(room.finisherId&&room.players.get(room.finisherId)?.eliminated)room.finisherId=null;
  if(room.players.get(room.turnPlayerId)?.eliminated)advance(room,room.turnPlayerId);
  finishIfReady(room);
 }
@@ -66,7 +82,7 @@ function playCard(room,playerId,cardId){
 }
 function drawOne(room,playerId){
  requireGame(room);const player=room.players.get(playerId);if(!player)throw Error('Jugador no encontrado.');
- if(player.eliminated)throw Error('Estás eliminado por superar 25 cartas.');
+ if(player.eliminated)throw Error('Estás eliminado: '+player.eliminationReason+'.');
  if(room.turnPlayerId!==playerId)throw Error('Solo puedes coger cartas en tu turno.');
  if(hasDrawn(room,playerId))throw Error('Ya cogiste una carta en este turno. Juega o pasa si la carta robada no es válida.');
  if(room.pending?.playerId===playerId||room.diceTask?.playerId===playerId)throw Error('Completa primero tu acción pendiente.');
@@ -100,4 +116,4 @@ function rollDice(room,playerId,taskId){
  room.diceResult=result;room.diceTask=null;finishIfReady(room);return result;
 }
 function completeShots(room,playerId){requireGame(room);if(room.pending||room.diceTask||room.penalty?.type!=='shots'||room.penalty.playerId!==playerId)throw Error('No tienes una penalización de shots pendiente.');room.penalty=null;advance(room,playerId);}
-module.exports={nextPlayer,finishIfReady,enforceLimits,canPlay,canDraw,canPass,playCard,drawOne,passTurn,completeAction,rollDice,completeShots};
+module.exports={nextPlayer,finishIfReady,enforceLimits,canPlay,canDraw,canPass,playCard,drawOne,passTurn,completeAction,rollDice,completeShots,syncTurnClock,expireTurn,TURN_LIMIT_MS};
